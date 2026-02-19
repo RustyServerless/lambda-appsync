@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Request hook trybuild test was not actually testing anything
 - Release CI could fail tests but still proceed with publishing
 
-[0.9.0]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.8.0...v0.9.0
+[0.9.0]: https://github.com/RustyServerless/lambda-appsync/compare/v0.8.0...v0.9.0
 
 ## [0.8.0] - 2025-11-16
 
@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated lambda_runtime dependency minimum version from 0.12 to 1.0, ensuring use of the version officially supported by the AWS Lambda team
 - Bumped Minimum Supported Rust Version (MSRV) from 1.81.0 to 1.82.0
 
-[0.8.0]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.7.0...v0.8.0
+[0.8.0]: https://github.com/RustyServerless/lambda-appsync/compare/v0.7.0...v0.8.0
 
 ## [0.7.0] - 2025-01-26
 
@@ -51,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking Changes
 - GraphQL input types now derive both `Serialize` and `Deserialize` instead of only `Deserialize`. This may affect code that had a manual implementation of `Serialize` for input types.
 
-[0.7.0]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.6.0...v0.7.0
+[0.7.0]: https://github.com/RustyServerless/lambda-appsync/compare/v0.6.0...v0.7.0
 
 ## [0.6.1] - 2025-08-24 [YANKED]
 
@@ -64,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Documentation badge in README now correctly links to the latest version instead of hardcoded v0.1.0
 
-[0.6.1]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.6.0...v0.6.1
+[0.6.1]: https://github.com/RustyServerless/lambda-appsync/compare/v0.6.0...v0.6.1
 
 ## [0.6.0] - 2025-04-21
 
@@ -93,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Clear indication of expected vs found types for arguments and return values
   - More accurate function signature mismatch reporting
 
-  See [Issue#7](https://github.com/JeremieRodon/lambda-appsync/issues/7) for detailed examples of the improved error messages.
+  See [Issue#7](https://github.com/RustyServerless/lambda-appsync/issues/7) for detailed examples of the improved error messages.
 - Internal restructuring of code generation to use trait bounds for signature verification instead of dummy function calls
 
 ### Fixed
@@ -109,14 +109,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Better module organization with clearer separation between public and internal APIs
 - Increased generated code size (approximately 2x) to support better error messages. While this may slightly increase compilation times, it has no runtime performance impact as the additional code is optimized away during compilation.
 
-[0.6.0]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.5.4...v0.6.0
+[0.6.0]: https://github.com/RustyServerless/lambda-appsync/compare/v0.5.4...v0.6.0
 
 ## [v0.5.4] - 2025-04-24
 
 ### Fixed
 - Bug where the `type_override` option was not working correctly for fields or arguments that were Rust keywords
 
-[v0.5.4]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.5.3...v0.5.4
+[v0.5.4]: https://github.com/RustyServerless/lambda-appsync/compare/v0.5.3...v0.5.4
 
 ## [v0.5.3] - 2025-04-24
 
@@ -124,7 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deprecated `field_type_override` option in favor of `type_override` to better reflect its broader scope covering both fields and arguments
 - (For project devs) Improved internal implementation of type override options for better clarity
 
-[v0.5.3]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.5.2...v0.5.3
+[v0.5.3]: https://github.com/RustyServerless/lambda-appsync/compare/v0.5.2...v0.5.3
 
 ## [v0.5.2] - 2025-04-23
 
@@ -138,7 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Bug in `keep_original_function_name` attribute where it would fail when operation handlers had arguments
 
-[v0.5.2]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.5.1...v0.5.2
+[v0.5.2]: https://github.com/RustyServerless/lambda-appsync/compare/v0.5.1...v0.5.2
 
 ## [v0.5.1] - 2025-04-21
 
@@ -148,7 +148,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Documentation linking issues between lambda-appsync and lambda-appsync-proc crates
 
-[v0.5.1]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.5.0...v0.5.1
+[v0.5.1]: https://github.com/RustyServerless/lambda-appsync/compare/v0.5.0...v0.5.1
 
 ## [v0.5.0] - 2025-04-21
 
@@ -164,21 +164,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Missing documentation links in the crate documentation
 
-[v0.5.0]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.4.2...v0.5.0
+[v0.5.0]: https://github.com/RustyServerless/lambda-appsync/compare/v0.4.2...v0.5.0
 
 ## [v0.4.2] - 2025-04-19
 
 ### Fixed
 - Clippy warnings and code style improvements
 
-[v0.4.2]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.4.1...v0.4.2
+[v0.4.2]: https://github.com/RustyServerless/lambda-appsync/compare/v0.4.1...v0.4.2
 
 ## [v0.4.1] - 2025-04-19 [YANKED]
 
 ### Changed
 - Enhanced test coverage for null handling in GraphQL schema type generation
 
-[v0.4.1]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.4.0...v0.4.1
+[v0.4.1]: https://github.com/RustyServerless/lambda-appsync/compare/v0.4.0...v0.4.1
 
 ## [v0.4.0] - 2025-04-19 [YANKED]
 
@@ -194,7 +194,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation examples and subscription filter code blocks
 - README referenced crate version
 
-[v0.4.0]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.3.0...v0.4.0
+[v0.4.0]: https://github.com/RustyServerless/lambda-appsync/compare/v0.3.0...v0.4.0
 
 ## [v0.3.0] - 2025-04-04
 
@@ -215,7 +215,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Memory allocation optimization
 - Documentation improvements
 
-[v0.3.0]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.2.0...v0.3.0
+[v0.3.0]: https://github.com/RustyServerless/lambda-appsync/compare/v0.2.0...v0.3.0
 
 ## [v0.2.0] - 2025-04-01
 
@@ -232,7 +232,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved documentation with compiled examples
 - Reorganized workspace dependencies
 
-[v0.2.0]: https://github.com/JeremieRodon/lambda-appsync/compare/v0.1.0...v0.2.0
+[v0.2.0]: https://github.com/RustyServerless/lambda-appsync/compare/v0.1.0...v0.2.0
 
 ## [v0.1.0] - 2025-03-30
 
@@ -248,4 +248,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for custom type overrides
 - Basic examples and documentation
 
-[v0.1.0]: https://github.com/JeremieRodon/lambda-appsync/releases/tag/v0.1.0
+[v0.1.0]: https://github.com/RustyServerless/lambda-appsync/releases/tag/v0.1.0

@@ -22,7 +22,7 @@ This repository is a Rust workspace with two crates:
 If you’ve found something that doesn’t look right:
 
 1. **Search existing issues** to see if it's already been reported.
-2. If not, [open a new issue](https://github.com/JeremieRodon/lambda-appsync/issues/new) and provide:
+2. If not, [open a new issue](https://github.com/RustyServerless/lambda-appsync/issues/new) and provide:
    - A clear title and description.
    - Steps to reproduce the issue.
    - Expected vs actual behavior.
@@ -104,7 +104,7 @@ Only maintainers can publish new versions. When a release is due:
 
 Have questions? Want to discuss implementation strategies or architecture? You can:
 
-- Open a [GitHub Discussion](https://github.com/JeremieRodon/lambda-appsync/discussions)
+- Open a [GitHub Discussion](https://github.com/RustyServerless/lambda-appsync/discussions)
 - Comment on open issues/PRs
 
 ---

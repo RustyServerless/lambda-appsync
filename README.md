@@ -1,8 +1,8 @@
 <!-- PROJECT SHIELDS -->
 [![crates.io](https://img.shields.io/crates/v/lambda-appsync.svg)](https://crates.io/crates/lambda-appsync)
 [![docs.rs](https://docs.rs/lambda-appsync/badge.svg)](https://docs.rs/lambda-appsync/latest/lambda_appsync)
-[![CI](https://github.com/JeremieRodon/lambda-appsync/workflows/CI/badge.svg)](https://github.com/JeremieRodon/lambda-appsync/actions)
-[![License](https://img.shields.io/github/license/JeremieRodon/lambda-appsync.svg)](https://github.com/JeremieRodon/lambda-appsync/blob/master/LICENSE)
+[![CI](https://github.com/RustyServerless/lambda-appsync/workflows/CI/badge.svg)](https://github.com/RustyServerless/lambda-appsync/actions)
+[![License](https://img.shields.io/github/license/RustyServerless/lambda-appsync.svg)](https://github.com/RustyServerless/lambda-appsync/blob/master/LICENSE)
 
 # lambda-appsync
 
@@ -134,7 +134,7 @@ null
 
 ## Example project
 
-Check out our [complete sample project](https://github.com/JeremieRodon/demo-rust-lambda-appsync) that demonstrates lambda-appsync in action! This full-featured demo implements a GraphQL API for a mini-game web application using AWS AppSync and Lambda, showcasing:
+Check out our [complete sample project](https://github.com/RustyServerless/benchmark-game) that demonstrates lambda-appsync in action! This full-featured demo implements a GraphQL API for a mini-game web application using AWS AppSync and Lambda, showcasing:
 
 - 🎮 Real-world GraphQL schema
 - 📊 DynamoDB integration
