@@ -97,6 +97,14 @@ pub use id::ID;
 
 #[doc(inline)]
 pub use lambda_appsync_proc::appsync_operation;
+#[doc(inline)]
+pub use lambda_appsync_proc::make_appsync;
+#[doc(inline)]
+pub use lambda_appsync_proc::make_handlers;
+#[doc(inline)]
+pub use lambda_appsync_proc::make_operation;
+#[doc(inline)]
+pub use lambda_appsync_proc::make_types;
 
 // Re-export crates that are mandatory for the proc_macro to succeed
 pub use lambda_runtime;

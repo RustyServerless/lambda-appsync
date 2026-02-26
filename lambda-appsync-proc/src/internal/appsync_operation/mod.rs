@@ -3,7 +3,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{braced, parenthesized, parse::Parse, parse_macro_input, Ident, Token, Type, Visibility};
 
-use crate::common::{Name, OperationKind};
+use super::common::{Name, OperationKind};
 
 enum ArgsOption {
     KeepOriginalFunctionName,

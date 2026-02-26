@@ -5,10 +5,9 @@ use proc_macro2::Span;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{spanned::Spanned, LitStr};
 
-use super::overrides::{FieldTypeOverride, FieldTypeOverrides, TypeNameOverride, TypeOverride};
-use crate::{
-    common::{Name, OperationKind},
-    make_appsync::overrides::OverrideParameters,
+use super::super::common::{Name, OperationKind};
+use super::overrides::{
+    FieldTypeOverride, FieldTypeOverrides, OverrideParameters, TypeNameOverride, TypeOverride,
 };
 
 thread_local! {
