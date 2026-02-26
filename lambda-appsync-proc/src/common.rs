@@ -129,20 +129,13 @@ impl Name {
                 CaseType::Camel => {
                     let mut word_iter = self.words.iter();
                     let first = word_iter.next().expect("non empty name");
-                    format!(
-                        "{first}{}",
-                        word_iter
-                            .map(|w| w.capitalize())
-                            .collect::<Vec<_>>()
-                            .join("")
-                    )
+                    Some(first)
+                        .into_iter()
+                        .chain(word_iter)
+                        .map(|w| w.capitalize())
+                        .collect()
                 }
-                CaseType::Pascal => self
-                    .words
-                    .iter()
-                    .map(|w| w.capitalize())
-                    .collect::<Vec<_>>()
-                    .join(""),
+                CaseType::Pascal => self.words.iter().map(|w| w.capitalize()).collect(),
                 CaseType::Snake => self.words.join("_"),
                 CaseType::Upper => self
                     .words

@@ -1,14 +1,13 @@
-mod graphql;
-mod overrides;
-
-use std::collections::HashMap;
-
-use graphql::GraphQLSchema;
-use overrides::{NameOverride, TypeOverride};
 use proc_macro::TokenStream;
-use proc_macro2::{Ident, TokenStream as TokenStream2};
+use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote, quote_spanned, ToTokens};
-use syn::{parenthesized, parse::Parse, parse_macro_input, LitBool, LitStr, Token, Type};
+use syn::{parenthesized, parse::Parse, parse_macro_input, Ident, LitBool, LitStr, Token, Type};
+
+use super::super::{
+    graphql::GraphQLSchema,
+    optional_parameter::{OptionalParameter, OptionalParameters, ParameterError, Unknown},
+    overrides::{NameOverride, NameOverrides, OverrideParameters, TypeOverride, TypeOverrides},
+};
 
 struct AWSClient {
     fct_identifier: Ident,
@@ -29,6 +28,7 @@ impl Parse for AWSClient {
         })
     }
 }
+
 impl AWSClient {
     fn is_next(input: syn::parse::ParseStream) -> bool {
         Self::parse(&input.fork()).is_ok()
@@ -61,7 +61,7 @@ impl AWSClient {
 }
 
 // I suppose this is acceptable for a proc-macro
-enum OptionalParameter {
+enum AppsyncLambdaMainParameter {
     Batch(bool),
     ExcludeLambdaHandler(bool),
     OnlyLambdaHandler(bool),
@@ -76,10 +76,9 @@ enum OptionalParameter {
     TypeOverride(TypeOverride),
     NameOverride(NameOverride),
 }
-impl Parse for OptionalParameter {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let ident = input.parse::<Ident>()?;
-        _ = input.parse::<Token![=]>()?;
+impl OptionalParameter for AppsyncLambdaMainParameter {
+    fn try_parse_parameter(input: syn::parse::ParseStream) -> Result<Self, ParameterError> {
+        let ident = Self::parse_ident(input)?;
         match ident.to_string().as_str() {
             "batch" => Ok(Self::Batch(input.parse::<LitBool>()?.value())),
             "exclude_lambda_handler" => Ok(Self::ExcludeLambdaHandler(
@@ -105,50 +104,12 @@ impl Parse for OptionalParameter {
             // Deprecated options
             "field_type_override" => Ok(Self::TypeOverride(input.parse()?)),
             // Unknown option
-            _ => Err(syn::Error::new(
-                ident.span(),
-                format!("Unknown parameter `{ident}`",),
-            )),
+            _ => ident.unknown(),
         }
     }
 }
 
-// Captures type_override = Type.field: CustomType and Type.field.param: CustomType options
-// using a HashMap hierarchy of TypeName -> FieldName -> (Optional field override, Map of arg overrides)
-// Top level mapping from GraphQL type names to their field overrides
-type TypeOverrides = HashMap<TypeName, FieldTypeOverrides>;
-
-// For each type, maps field names to their overrides
-type FieldTypeOverrides = HashMap<FieldName, FieldTypeOverride>;
-
-// A field can have both a direct type override and argument type overrides
-// - First element: Optional field type override (Type.field: CustomType)
-// - Second element: Map of argument overrides (Type.field.arg: CustomType)
-type FieldTypeOverride = (Option<TypeOverride>, ArgTypeOverrides);
-
-// Maps argument names to their type overrides for a field
-type ArgTypeOverrides = HashMap<ArgName, TypeOverride>;
-
-// Captures name_override = Type: CustomName and Type.field: custom_name options
-// using a HashMap hierarchy of TypeName -> (Optional type override, Map of field overrides)
-// This works the same for name_override = Enum: CustomEnumName and Enum.VARIANT: CustomVariant
-// Top level mapping from GraphQL type names to their field overrides
-type NameOverrides = HashMap<TypeName, TypeNameOverride>;
-
-// A type can have both a direct name override and field name overrides
-// - First element: Optional type name override (Type: CustomName)
-// - Second element: Map of field overrides (Type.field: custom_name)
-type TypeNameOverride = (Option<NameOverride>, FieldNameOverrides);
-
-// Maps field names to their name overrides for a field
-type FieldNameOverrides = HashMap<FieldName, NameOverride>;
-
-// [Type|Field|Arg]Name are just String
-type TypeName = String;
-type FieldName = String;
-type ArgName = String;
-
-struct OptionalParameters {
+struct AppsyncLambdaMainParameters {
     batch: bool,
     appsync_types: bool,
     appsync_operations: bool,
@@ -160,7 +121,7 @@ struct OptionalParameters {
     tos: TypeOverrides,
     nos: NameOverrides,
 }
-impl Default for OptionalParameters {
+impl Default for AppsyncLambdaMainParameters {
     fn default() -> Self {
         Self {
             batch: true,
@@ -176,39 +137,41 @@ impl Default for OptionalParameters {
         }
     }
 }
-impl OptionalParameters {
-    fn set(&mut self, p: OptionalParameter) {
+impl OptionalParameters<AppsyncLambdaMainParameter> for AppsyncLambdaMainParameters {
+    fn set_param(&mut self, p: AppsyncLambdaMainParameter) {
         match p {
-            OptionalParameter::Batch(batch) => self.batch = batch,
-            OptionalParameter::ExcludeLambdaHandler(b) if b => self.lambda_handler = false,
-            OptionalParameter::OnlyLambdaHandler(b) if b => {
+            AppsyncLambdaMainParameter::Batch(batch) => self.batch = batch,
+            AppsyncLambdaMainParameter::ExcludeLambdaHandler(b) if b => self.lambda_handler = false,
+            AppsyncLambdaMainParameter::OnlyLambdaHandler(b) if b => {
                 self.lambda_handler = true;
                 self.appsync_types = false;
                 self.appsync_operations = false;
             }
-            OptionalParameter::ExcludeAppsyncTypes(b) if b => self.appsync_types = false,
-            OptionalParameter::OnlyAppsyncTypes(b) if b => {
+            AppsyncLambdaMainParameter::ExcludeAppsyncTypes(b) if b => self.appsync_types = false,
+            AppsyncLambdaMainParameter::OnlyAppsyncTypes(b) if b => {
                 self.lambda_handler = false;
                 self.appsync_types = true;
                 self.appsync_operations = false;
             }
-            OptionalParameter::ExcludeAppsyncOperations(b) if b => self.appsync_operations = false,
-            OptionalParameter::OnlyAppsyncOperations(b) if b => {
+            AppsyncLambdaMainParameter::ExcludeAppsyncOperations(b) if b => {
+                self.appsync_operations = false
+            }
+            AppsyncLambdaMainParameter::OnlyAppsyncOperations(b) if b => {
                 self.lambda_handler = false;
                 self.appsync_types = false;
                 self.appsync_operations = true;
             }
-            OptionalParameter::Hook(ident) => {
+            AppsyncLambdaMainParameter::Hook(ident) => {
                 self.hook.replace(ident);
             }
-            OptionalParameter::LogInit(ident) => {
+            AppsyncLambdaMainParameter::LogInit(ident) => {
                 self.log_init.replace(ident);
             }
             #[cfg(feature = "log")]
-            OptionalParameter::EventLogging(b) => {
+            AppsyncLambdaMainParameter::EventLogging(b) => {
                 self.event_logging = b;
             }
-            OptionalParameter::TypeOverride(to) => {
+            AppsyncLambdaMainParameter::TypeOverride(to) => {
                 // Retrieve the entry corresponding to `Type.field`
                 let to_field_entry = self
                     .tos
@@ -226,7 +189,7 @@ impl OptionalParameters {
                     to_field_entry.0.replace(to);
                 }
             }
-            OptionalParameter::NameOverride(no) => {
+            AppsyncLambdaMainParameter::NameOverride(no) => {
                 // Retrieve the entry corresponding to `Type`
                 let no_type_entry = self.nos.entry(no.type_name().to_string()).or_default();
                 if let Some(field_name) = no.field_name() {
@@ -239,12 +202,12 @@ impl OptionalParameters {
                     no_type_entry.0.replace(no);
                 }
             }
-            OptionalParameter::ExcludeLambdaHandler(_)
-            | OptionalParameter::OnlyLambdaHandler(_)
-            | OptionalParameter::ExcludeAppsyncTypes(_)
-            | OptionalParameter::OnlyAppsyncTypes(_)
-            | OptionalParameter::ExcludeAppsyncOperations(_)
-            | OptionalParameter::OnlyAppsyncOperations(_) => (),
+            AppsyncLambdaMainParameter::ExcludeLambdaHandler(_)
+            | AppsyncLambdaMainParameter::OnlyLambdaHandler(_)
+            | AppsyncLambdaMainParameter::ExcludeAppsyncTypes(_)
+            | AppsyncLambdaMainParameter::OnlyAppsyncTypes(_)
+            | AppsyncLambdaMainParameter::ExcludeAppsyncOperations(_)
+            | AppsyncLambdaMainParameter::OnlyAppsyncOperations(_) => (),
         }
     }
 }
@@ -252,44 +215,14 @@ impl OptionalParameters {
 struct AppsyncLambdaMain {
     graphql_schema: GraphQLSchema,
     aws_clients: Vec<AWSClient>,
-    options: OptionalParameters,
+    options: AppsyncLambdaMainParameters,
 }
 
 impl Parse for AppsyncLambdaMain {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let graphql_schema_path = input.parse::<LitStr>()?;
-        let path_value = graphql_schema_path.value();
-        let full_path = if std::path::Path::new(&path_value).is_relative() {
-            std::env::current_dir()
-                .map_err(|e| {
-                    syn::Error::new(
-                        graphql_schema_path.span(),
-                        format!("Could not get current directory: {e}"),
-                    )
-                })?
-                .join(&path_value)
-        } else {
-            std::path::PathBuf::from(path_value)
-        };
-        let schema_str = std::fs::read_to_string(&full_path).map_err(|e| {
-            syn::Error::new(
-                graphql_schema_path.span(),
-                format!(
-                    "Could not open GraphQL schema file at '{}' ({e})",
-                    full_path.display()
-                ),
-            )
-        })?;
-        let schema = graphql_parser::parse_schema(&schema_str)
-            .map_err(|e| {
-                syn::Error::new(
-                    graphql_schema_path.span(),
-                    format!("Could not parse GraphQL schema file ({e})",),
-                )
-            })?
-            .into_static();
 
-        let mut options = OptionalParameters::default();
+        let mut parameters = AppsyncLambdaMainParameters::default();
         let mut aws_clients = vec![];
 
         while input.peek(Token![,]) {
@@ -297,10 +230,19 @@ impl Parse for AppsyncLambdaMain {
             if input.is_empty() {
                 break;
             }
-            if input.peek(syn::Ident) && input.peek2(Token![=]) {
-                // That's a parameter
-                options.set(input.parse()?);
-            } else if AWSClient::is_next(input) {
+
+            match parameters.try_parse_parameter(input) {
+                // Matched, so go on to the next one
+                Ok(()) => continue,
+                Err(pe) => match pe {
+                    // Not a parameter, try matching an AWS Client
+                    ParameterError::NotParameter(_) => {}
+                    // Hard errors, return
+                    ParameterError::InexistantParameter(error)
+                    | ParameterError::ArgumentError(error) => return Err(error),
+                },
+            }
+            if AWSClient::is_next(input) {
                 aws_clients.push(input.parse::<AWSClient>()?);
             } else {
                 return Err(syn::Error::new(input.span(), "Unknown argument"));
@@ -308,16 +250,17 @@ impl Parse for AppsyncLambdaMain {
         }
 
         let graphql_schema = GraphQLSchema::new(
-            schema,
-            graphql_schema_path.span(),
-            std::mem::take(&mut options.tos),
-            std::mem::take(&mut options.nos),
+            graphql_schema_path,
+            OverrideParameters {
+                type_overrides: std::mem::take(&mut parameters.tos),
+                name_overrides: std::mem::take(&mut parameters.nos),
+            },
         )?;
 
         Ok(Self {
             graphql_schema,
             aws_clients,
-            options,
+            options: parameters,
         })
     }
 }
@@ -542,8 +485,5 @@ impl ToTokens for AppsyncLambdaMain {
 
 pub(crate) fn appsync_lambda_main_impl(input: TokenStream) -> TokenStream {
     let alm = parse_macro_input!(input as AppsyncLambdaMain);
-    quote! {
-        #alm
-    }
-    .into()
+    alm.into_token_stream().into()
 }

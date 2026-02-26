@@ -96,17 +96,23 @@ pub use aws_scalars::{
 pub use id::ID;
 
 #[doc(inline)]
-pub use lambda_appsync_proc::appsync_lambda_main;
-
-#[doc(inline)]
 pub use lambda_appsync_proc::appsync_operation;
 
 // Re-export crates that are mandatory for the proc_macro to succeed
-pub use aws_config;
 pub use lambda_runtime;
 pub use serde;
 pub use serde_json;
-pub use tokio;
+
+#[cfg(feature = "compat")]
+mod compat {
+    pub use aws_config;
+    pub use tokio;
+
+    #[doc(inline)]
+    pub use lambda_appsync_proc::appsync_lambda_main;
+}
+#[cfg(feature = "compat")]
+pub use compat::*;
 
 #[cfg(feature = "log")]
 pub use log;

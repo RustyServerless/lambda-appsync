@@ -1,20 +1,22 @@
 use std::cell::RefCell;
 
-use graphql_parser::schema::{Definition, Document, TypeDefinition};
+use graphql_parser::schema::{Definition, TypeDefinition};
 use proc_macro2::Span;
 use quote::{quote, quote_spanned, ToTokens};
-use syn::spanned::Spanned;
+use syn::{spanned::Spanned, LitStr};
 
-use crate::common::{Name, OperationKind};
-
-use super::TypeOverride;
+use super::overrides::{FieldTypeOverride, FieldTypeOverrides, TypeNameOverride, TypeOverride};
+use crate::{
+    common::{Name, OperationKind},
+    make_appsync::overrides::OverrideParameters,
+};
 
 thread_local! {
-    static CURRENT_SPAN: RefCell<Span> = RefCell::new(Span::call_site());
+    static GRAPHQL_PATH_SPAN: RefCell<Span> = RefCell::new(Span::call_site());
 }
 // Get the current span
-fn current_span() -> Span {
-    CURRENT_SPAN.with(|s| *s.borrow())
+fn graphql_path_span() -> Span {
+    GRAPHQL_PATH_SPAN.with(|s| *s.borrow())
 }
 
 enum Scalar {
@@ -60,7 +62,7 @@ impl TryFrom<&str> for Scalar {
 }
 impl ToTokens for Scalar {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let span = current_span();
+        let span = graphql_path_span();
         tokens.extend(match self {
             Scalar::String => quote_spanned! {span=>String},
             Scalar::ID => quote_spanned! {span=>::lambda_appsync::ID},
@@ -92,7 +94,7 @@ impl FieldType {
         if let Ok(scalar) = Scalar::try_from(name.as_str()) {
             Self::Scalar(scalar)
         } else {
-            let name = Name::from((name, current_span()));
+            let name = Name::from((name, graphql_path_span()));
             Self::Custom { name }
         }
     }
@@ -135,7 +137,7 @@ impl From<graphql_parser::schema::Type<'_, String>> for FieldType {
 }
 impl ToTokens for FieldType {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let span = current_span();
+        let span = graphql_path_span();
         match self {
             FieldType::Custom { name } => {
                 let name = name.to_type_ident();
@@ -157,14 +159,14 @@ struct Field {
 }
 impl From<graphql_parser::schema::Field<'_, String>> for Field {
     fn from(value: graphql_parser::schema::Field<'_, String>) -> Self {
-        let name = Name::from((value.name, current_span()));
+        let name = Name::from((value.name, graphql_path_span()));
         let field_type = FieldType::from(value.field_type);
         Self { name, field_type }
     }
 }
 impl From<graphql_parser::schema::InputValue<'_, String>> for Field {
     fn from(value: graphql_parser::schema::InputValue<'_, String>) -> Self {
-        let name = Name::from((value.name, current_span()));
+        let name = Name::from((value.name, graphql_path_span()));
         let field_type = FieldType::from(value.value_type);
         Self { name, field_type }
     }
@@ -187,7 +189,7 @@ impl ToTokens for FieldContext<'_> {
 
         let field_type = &field.field_type;
         let mut serde_options = vec![];
-        let span = current_span();
+        let span = graphql_path_span();
         if name != orig_name {
             serde_options.push(quote_spanned! {span=>
                 rename = #orig_name
@@ -216,7 +218,7 @@ struct Structure {
 impl Structure {
     fn apply_type_overrides(
         &mut self,
-        mut type_overrides: super::FieldTypeOverrides,
+        mut type_overrides: FieldTypeOverrides,
     ) -> Result<(), syn::Error> {
         let mut errors = vec![];
         for field in self.fields.iter_mut() {
@@ -262,7 +264,7 @@ impl Structure {
     }
     fn apply_name_overrides(
         &mut self,
-        (type_override, mut field_overrides): super::TypeNameOverride,
+        (type_override, mut field_overrides): TypeNameOverride,
     ) -> Result<(), syn::Error> {
         let mut errors = vec![];
         if let Some(type_override) = type_override {
@@ -303,7 +305,7 @@ impl Structure {
 }
 impl From<graphql_parser::schema::ObjectType<'_, String>> for Structure {
     fn from(value: graphql_parser::schema::ObjectType<'_, String>) -> Self {
-        let name = Name::from((value.name, current_span()));
+        let name = Name::from((value.name, graphql_path_span()));
         let fields = value.fields.into_iter().map(Field::from).collect();
         Self { name, fields }
     }
@@ -317,7 +319,7 @@ impl From<graphql_parser::schema::InputObjectType<'_, String>> for Structure {
 }
 impl ToTokens for Structure {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let span = current_span();
+        let span = graphql_path_span();
         let struct_name = self.name.to_type_ident();
         let fields = self.fields.iter().map(FieldContext::new);
         tokens.extend(quote_spanned! {span=>
@@ -337,7 +339,7 @@ struct Enum {
 impl Enum {
     fn apply_name_overrides(
         &mut self,
-        (type_override, mut field_overrides): super::TypeNameOverride,
+        (type_override, mut field_overrides): TypeNameOverride,
     ) -> Result<(), syn::Error> {
         let mut errors = vec![];
         if let Some(type_override) = type_override {
@@ -378,11 +380,11 @@ impl Enum {
 }
 impl From<graphql_parser::schema::EnumType<'_, String>> for Enum {
     fn from(value: graphql_parser::schema::EnumType<'_, String>) -> Self {
-        let name = Name::from((value.name, current_span()));
+        let name = Name::from((value.name, graphql_path_span()));
         let variants = value
             .values
             .into_iter()
-            .map(|v| Name::from((v.name, current_span())))
+            .map(|v| Name::from((v.name, graphql_path_span())))
             .collect();
         Self { name, variants }
     }
@@ -398,7 +400,7 @@ impl ToTokens for Enum {
             .map(|n| n.to_type_ident())
             .collect::<Vec<_>>();
         let error_message = format!("`{{}}` is an invalid value for enum {}", enum_name);
-        let span = current_span();
+        let span = graphql_path_span();
         tokens.extend(quote_spanned! {span=>
             #[derive(Debug, Clone, Copy, ::lambda_appsync::serde::Serialize, ::lambda_appsync::serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
             pub enum #enum_name {
@@ -445,7 +447,7 @@ impl Operation {
     }
     fn default_op(&self, kind: OperationKind) -> proc_macro2::TokenStream {
         let fct_name = self.name.to_prefixed_fct_ident(kind.fct_prefix());
-        let span = current_span();
+        let span = graphql_path_span();
         let return_type = match kind {
             OperationKind::Query | OperationKind::Mutation => {
                 let return_type = &self.return_type;
@@ -477,7 +479,7 @@ impl Operation {
         }
     }
     fn execute_match_arm(&self, kind: OperationKind) -> proc_macro2::TokenStream {
-        let span = current_span();
+        let span = graphql_path_span();
         let operation_enum_name = kind.operation_enum_name(span);
         let variant = self.name.to_type_ident();
         let fct_name = self.name.to_prefixed_fct_ident(kind.fct_prefix());
@@ -488,7 +490,7 @@ impl Operation {
         }
     }
     fn argument_extractor(&self, with_event: bool) -> proc_macro2::TokenStream {
-        let span = current_span();
+        let span = graphql_path_span();
         let params_types = self.args.iter().map(|arg| &arg.field_type);
         let param_strs = self.args.iter().map(|arg| arg.name.orig());
 
@@ -543,7 +545,7 @@ impl Operation {
                     ::core::result::Result<#return_type, ::lambda_appsync::AppsyncError>
                 }
             }
-            OperationKind::Subscription => quote_spanned! {current_span()=>
+            OperationKind::Subscription => quote_spanned! {graphql_path_span()=>
                 ::core::result::Result<::core::option::Option<::lambda_appsync::subscription_filters::FilterGroup>, ::lambda_appsync::AppsyncError>
             },
         };
@@ -565,7 +567,7 @@ impl Operation {
     }
     fn apply_type_overrides(
         &mut self,
-        (field_type_override, mut arg_type_overrides): super::FieldTypeOverride,
+        (field_type_override, mut arg_type_overrides): FieldTypeOverride,
     ) -> Result<(), syn::Error> {
         let mut errors = vec![];
         if let Some(field_type_override) = field_type_override {
@@ -649,7 +651,7 @@ impl Operations {
     }
     fn apply_type_overrides(
         &mut self,
-        mut type_overrides: super::FieldTypeOverrides,
+        mut type_overrides: FieldTypeOverrides,
     ) -> Result<(), syn::Error> {
         let mut errors = vec![];
         for op in self.0.iter_mut() {
@@ -732,7 +734,7 @@ impl From<graphql_parser::schema::SchemaDefinition<'_, String>> for SchemaDefini
     }
 }
 
-pub(crate) struct GraphQLSchema {
+pub(super) struct GraphQLSchema {
     queries: Operations,
     mutations: Operations,
     subscriptions: Operations,
@@ -740,11 +742,9 @@ pub(crate) struct GraphQLSchema {
     enums: Vec<Enum>,
 }
 impl GraphQLSchema {
-    pub(crate) fn new(
-        mut doc: Document<'_, String>,
-        span: proc_macro2::Span,
-        mut tos: super::TypeOverrides,
-        mut nos: super::NameOverrides,
+    pub(super) fn new(
+        graphql_schema_path: LitStr,
+        overrides: OverrideParameters,
     ) -> Result<Self, syn::Error> {
         let mut queries = None;
         let mut mutations = None;
@@ -752,14 +752,48 @@ impl GraphQLSchema {
         let mut structures = vec![];
         let mut enums = vec![];
 
-        CURRENT_SPAN.replace(span);
+        let path_value = graphql_schema_path.value();
+        let span = graphql_schema_path.span();
+        let full_path = if std::path::Path::new(&path_value).is_relative() {
+            std::env::current_dir()
+                .map_err(|e| {
+                    syn::Error::new(
+                        graphql_schema_path.span(),
+                        format!("Could not get current directory: {e}"),
+                    )
+                })?
+                .join(&path_value)
+        } else {
+            std::path::PathBuf::from(path_value)
+        };
+        let schema_str = std::fs::read_to_string(&full_path).map_err(|e| {
+            syn::Error::new(
+                graphql_schema_path.span(),
+                format!(
+                    "Could not open GraphQL schema file at '{}' ({e})",
+                    full_path.display()
+                ),
+            )
+        })?;
 
-        let sd = if let Some(index) = doc
+        let mut graphql_schema = graphql_parser::parse_schema(&schema_str)
+            .map_err(|e| {
+                syn::Error::new(
+                    graphql_schema_path.span(),
+                    format!("Could not parse GraphQL schema file ({e})",),
+                )
+            })?
+            .into_static();
+
+        GRAPHQL_PATH_SPAN.replace(span);
+
+        let sd = if let Some(index) = graphql_schema
             .definitions
             .iter()
             .position(|def| matches!(def, Definition::SchemaDefinition(_)))
         {
-            let Definition::SchemaDefinition(def) = doc.definitions.swap_remove(index) else {
+            let Definition::SchemaDefinition(def) = graphql_schema.definitions.swap_remove(index)
+            else {
                 unreachable!("just verified it is a schema def")
             };
             SchemaDefinition::from(def)
@@ -767,14 +801,19 @@ impl GraphQLSchema {
             SchemaDefinition::default()
         };
 
+        let OverrideParameters {
+            mut type_overrides,
+            mut name_overrides,
+        } = overrides;
+
         let mut errors = vec![];
-        for def in doc.definitions {
-            match def {
+        for definition in graphql_schema.definitions {
+            match definition {
                 Definition::TypeDefinition(type_definition) => {
                     match type_definition {
                         TypeDefinition::Object(object_type) => {
                             if let Some(sdt) = sd.schema_definition(&object_type.name) {
-                                let type_overrides = tos.remove(&object_type.name);
+                                let type_overrides = type_overrides.remove(&object_type.name);
                                 let mut ops = Operations::from(object_type);
                                 if let Some(type_overrides) = type_overrides {
                                     match ops.apply_type_overrides(type_overrides) {
@@ -795,13 +834,17 @@ impl GraphQLSchema {
                                 }
                             } else {
                                 let mut structure = Structure::from(object_type);
-                                if let Some(type_overrides) = tos.remove(structure.name.orig()) {
+                                if let Some(type_overrides) =
+                                    type_overrides.remove(structure.name.orig())
+                                {
                                     match structure.apply_type_overrides(type_overrides) {
                                         Ok(_) => (),
                                         Err(e) => errors.push(e),
                                     };
                                 }
-                                if let Some(name_overrides) = nos.remove(structure.name.orig()) {
+                                if let Some(name_overrides) =
+                                    name_overrides.remove(structure.name.orig())
+                                {
                                     match structure.apply_name_overrides(name_overrides) {
                                         Ok(_) => (),
                                         Err(e) => errors.push(e),
@@ -812,7 +855,8 @@ impl GraphQLSchema {
                         }
                         TypeDefinition::Enum(enum_type) => {
                             let mut r_enum = Enum::from(enum_type);
-                            if let Some(name_overrides) = nos.remove(r_enum.name.orig()) {
+                            if let Some(name_overrides) = name_overrides.remove(r_enum.name.orig())
+                            {
                                 match r_enum.apply_name_overrides(name_overrides) {
                                     Ok(_) => (),
                                     Err(e) => errors.push(e),
@@ -822,13 +866,17 @@ impl GraphQLSchema {
                         }
                         TypeDefinition::InputObject(input_object_type) => {
                             let mut structure = Structure::from(input_object_type);
-                            if let Some(type_overrides) = tos.remove(structure.name.orig()) {
+                            if let Some(type_overrides) =
+                                type_overrides.remove(structure.name.orig())
+                            {
                                 match structure.apply_type_overrides(type_overrides) {
                                     Ok(_) => (),
                                     Err(e) => errors.push(e),
                                 };
                             }
-                            if let Some(name_overrides) = nos.remove(structure.name.orig()) {
+                            if let Some(name_overrides) =
+                                name_overrides.remove(structure.name.orig())
+                            {
                                 match structure.apply_name_overrides(name_overrides) {
                                     Ok(_) => (),
                                     Err(e) => errors.push(e),
@@ -855,9 +903,10 @@ impl GraphQLSchema {
             }
         }
 
-        if !tos.is_empty() {
+        if !type_overrides.is_empty() {
             errors.extend(
-                tos.into_values()
+                type_overrides
+                    .into_values()
                     .flat_map(|fos| fos.into_values())
                     .flat_map(|fo| fo.0.into_iter().chain(fo.1.into_values()))
                     .map(|to| {
@@ -868,9 +917,10 @@ impl GraphQLSchema {
                     }),
             );
         }
-        if !nos.is_empty() {
+        if !name_overrides.is_empty() {
             errors.extend(
-                nos.into_values()
+                name_overrides
+                    .into_values()
                     .flat_map(|no| no.0.into_iter().chain(no.1.into_values()))
                     .map(|no| {
                         syn::Error::new(
@@ -900,20 +950,20 @@ impl GraphQLSchema {
     }
     fn enums_to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let enums = self.enums.iter();
-        let span = current_span();
+        let span = graphql_path_span();
         tokens.extend(quote_spanned! {span=>
             #(#enums)*
         });
     }
     fn structs_to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let structures = self.structures.iter();
-        let span = current_span();
+        let span = graphql_path_span();
         tokens.extend(quote_spanned! {span=>
             #(#structures)*
         });
     }
     fn operation_to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let span = current_span();
+        let span = graphql_path_span();
         let query_field_name = OperationKind::Query.operation_enum_name(span);
         let query_field_variants = self.queries.variants_iter();
         let mutation_field_name = OperationKind::Mutation.operation_enum_name(span);
@@ -953,7 +1003,7 @@ impl GraphQLSchema {
         let subscription_field_default_ops = self
             .subscriptions
             .default_op_iter(OperationKind::Subscription);
-        tokens.extend(quote_spanned! {current_span()=>
+        tokens.extend(quote_spanned! {graphql_path_span()=>
             pub(super) trait DefaultOperations {
                 #(#query_field_default_ops)*
                 #(#mutation_field_default_ops)*
@@ -972,7 +1022,7 @@ impl GraphQLSchema {
             .subscriptions
             .execute_match_arm_iter(OperationKind::Subscription);
 
-        let span = current_span();
+        let span = graphql_path_span();
 
         #[allow(unused_mut)]
         let mut log_lines = proc_macro2::TokenStream::new();

@@ -21,7 +21,7 @@ proc-macro2 = { workspace = true }
 graphql-parser = { workspace = true }
 
 [dev-dependencies]
-lambda-appsync = { path = "../lambda-appsync", default-features = false, features = ["log", "env_logger", "tracing"] }
+lambda-appsync = { path = "../lambda-appsync", default-features = false, features = ["log", "env_logger", "tracing", "compat"] }
 tracing = { workspace = true }
 aws-sdk-s3 = { workspace = true }
 aws-sdk-dynamodb = { workspace = true }
@@ -29,7 +29,8 @@ serde = { workspace = true }
 trybuild = { workspace = true }
 
 [features]
-default = ["log", "env_logger", "tracing"]
+default = ["log", "env_logger", "tracing", "compat"]
+compat = []
 log = []
-env_logger = []
+env_logger = ["compat"]
 tracing = []
