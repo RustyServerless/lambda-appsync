@@ -91,14 +91,14 @@ impl ToTokens for MakeHandlers {
             batch_handler.extend(quote! {
                 #[doc = "Handles a batch of [lambda_appsync::AppsyncEvent<Operation>] concurrently."]
                 async fn appsync_batch_handler(
-                    events: Vec<::lambda_appsync::AppsyncEvent<#operation>>
-                ) -> Vec<::lambda_appsync::AppsyncResponse> {
+                    events: ::std::vec::Vec<::lambda_appsync::AppsyncEvent<#operation>>
+                ) -> ::std::vec::Vec<::lambda_appsync::AppsyncResponse> {
                     let handles = events
                         .into_iter()
                         .map(|e| ::lambda_appsync::tokio::spawn(Self::appsync_handler(e)))
-                        .collect::<Vec<_>>();
+                        .collect::<::std::vec::Vec<_>>();
 
-                    let mut results = vec![];
+                    let mut results = ::std::vec::Vec::new();
                     for h in handles {
                         results.push(h.await.unwrap())
                     }
@@ -119,16 +119,28 @@ impl ToTokens for MakeHandlers {
             )
         };
 
+        let appsync_handler = if self.batch {
+            quote! {
+                fn appsync_handler(
+                    event: ::lambda_appsync::AppsyncEvent<#operation>
+                ) -> impl std::future::Future<Output = ::lambda_appsync::AppsyncResponse> + Send + 'static {
+                    event.info.operation.execute(event)
+                }
+            }
+        } else {
+            quote! {
+                async fn appsync_handler(event: ::lambda_appsync::AppsyncEvent<#operation>) -> ::lambda_appsync::AppsyncResponse {
+                    event.info.operation.execute(event).await
+                }
+            }
+        };
+
         tokens.extend(quote! {
 
             #[deny(dead_code)]
             trait Handlers {
                 #[doc = "Handles a single deserialized [lambda_appsync::AppsyncEvent<Operation>]."]
-                async fn appsync_handler(
-                    event: ::lambda_appsync::AppsyncEvent<#operation>
-                ) -> ::lambda_appsync::AppsyncResponse {
-                    event.info.operation.execute(event).await
-                }
+                #appsync_handler
 
                 #batch_handler
 

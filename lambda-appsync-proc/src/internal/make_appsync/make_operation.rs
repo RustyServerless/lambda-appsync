@@ -2,7 +2,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::ToTokens;
 use syn::{
     parse::{Parse, ParseStream},
-    parse_macro_input, LitStr, Result, Token,
+    parse_macro_input, LitStr, Path, Result, Token,
 };
 
 use super::{
@@ -10,12 +10,15 @@ use super::{
     GraphQLSchema, OverrideParameters,
 };
 
-pub(super) enum MakeOperationParameter {}
+pub(super) enum MakeOperationParameter {
+    TypeModule(Path),
+}
 impl OptionalParameter for MakeOperationParameter {
     fn try_parse_parameter(input: ParseStream) -> core::result::Result<Self, ParameterError> {
         let ident = Self::parse_ident(input)?;
         #[allow(clippy::match_single_binding)]
         match ident.to_string().as_str() {
+            "type_module" => Ok(Self::TypeModule(input.parse()?)),
             // Unknown option
             _ => ident.unknown(),
         }
@@ -23,17 +26,19 @@ impl OptionalParameter for MakeOperationParameter {
 }
 
 #[derive(Default)]
-pub(super) struct MakeOperationParameters {}
+pub(super) struct MakeOperationParameters {
+    type_module: Option<Path>,
+}
 impl OptionalParameters<MakeOperationParameter> for MakeOperationParameters {
     fn set_param(&mut self, p: MakeOperationParameter) {
-        match p {}
+        match p {
+            MakeOperationParameter::TypeModule(path) => self.type_module = Some(path),
+        }
     }
 }
 
 struct MakeOperation {
     graphql_schema: GraphQLSchema,
-    #[allow(dead_code)]
-    parameters: MakeOperationParameters,
 }
 
 impl Parse for MakeOperation {
@@ -64,12 +69,13 @@ impl Parse for MakeOperation {
             parameters.try_parse_parameter(input)?;
         }
 
-        let graphql_schema = GraphQLSchema::new(graphql_schema_path, override_parameters)?;
+        let graphql_schema = GraphQLSchema::new(
+            graphql_schema_path,
+            override_parameters,
+            parameters.type_module,
+        )?;
 
-        Ok(Self {
-            graphql_schema,
-            parameters,
-        })
+        Ok(Self { graphql_schema })
     }
 }
 

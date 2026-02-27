@@ -255,6 +255,7 @@ impl Parse for AppsyncLambdaMain {
                 type_overrides: std::mem::take(&mut parameters.tos),
                 name_overrides: std::mem::take(&mut parameters.nos),
             },
+            None,
         )?;
 
         Ok(Self {
@@ -319,12 +320,12 @@ impl AppsyncLambdaMain {
         if self.options.batch {
             tokens.extend(quote! {
                 async fn appsync_batch_handler(
-                    events: Vec<::lambda_appsync::AppsyncEvent<Operation>>,
-                ) -> Vec<::lambda_appsync::AppsyncResponse> {
+                    events: ::std::vec::Vec<::lambda_appsync::AppsyncEvent<Operation>>,
+                ) -> ::std::vec::Vec<::lambda_appsync::AppsyncResponse> {
                     let handles = events
                         .into_iter()
                         .map(|e| ::lambda_appsync::tokio::spawn(appsync_handler(e)))
-                        .collect::<Vec<_>>();
+                        .collect::<::std::vec::Vec<_>>();
 
                     let mut results = vec![];
                     for h in handles {
@@ -374,7 +375,7 @@ impl AppsyncLambdaMain {
         let (appsync_handler, ret_type) = if self.options.batch {
             (
                 format_ident!("appsync_batch_handler"),
-                quote! {Vec<::lambda_appsync::AppsyncResponse>},
+                quote! {::std::vec::Vec<::lambda_appsync::AppsyncResponse>},
             )
         } else {
             (

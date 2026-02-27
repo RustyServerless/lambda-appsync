@@ -32,8 +32,6 @@ impl OptionalParameters<MakeTypesParameter> for MakeTypesParameters {
 
 struct MakeTypes {
     graphql_schema: GraphQLSchema,
-    #[allow(dead_code)]
-    parameters: MakeTypesParameters,
 }
 
 impl Parse for MakeTypes {
@@ -64,12 +62,9 @@ impl Parse for MakeTypes {
             parameters.try_parse_parameter(input)?;
         }
 
-        let graphql_schema = GraphQLSchema::new(graphql_schema_path, override_parameters)?;
+        let graphql_schema = GraphQLSchema::new(graphql_schema_path, override_parameters, None)?;
 
-        Ok(Self {
-            graphql_schema,
-            parameters,
-        })
+        Ok(Self { graphql_schema })
     }
 }
 

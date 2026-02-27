@@ -29,10 +29,6 @@ use syn::{
 struct MakeAppsync {
     graphql_schema: GraphQLSchema,
     make_handlers: MakeHandlers,
-    #[allow(dead_code)]
-    make_types_parameters: MakeTypesParameters,
-    #[allow(dead_code)]
-    make_operation_parameters: MakeOperationParameters,
 }
 
 impl Parse for MakeAppsync {
@@ -89,13 +85,11 @@ impl Parse for MakeAppsync {
             make_handlers_parameters.try_parse_parameter(input)?;
         }
 
-        let graphql_schema = GraphQLSchema::new(graphql_schema_path, override_parameters)?;
+        let graphql_schema = GraphQLSchema::new(graphql_schema_path, override_parameters, None)?;
 
         Ok(Self {
             graphql_schema,
             make_handlers: make_handlers_parameters.into(),
-            make_types_parameters,
-            make_operation_parameters,
         })
     }
 }

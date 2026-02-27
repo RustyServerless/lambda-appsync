@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use graphql_parser::schema::{Definition, TypeDefinition};
 use proc_macro2::Span;
 use quote::{quote, quote_spanned, ToTokens};
+use syn::Path;
 use syn::{spanned::Spanned, LitStr};
 
 use super::super::common::{Name, OperationKind};
@@ -83,7 +84,7 @@ impl ToTokens for Scalar {
 
 enum FieldType {
     Overriden(syn::Type),
-    Custom { name: Name },
+    Custom { name: Name, path: Option<Path> },
     Scalar(Scalar),
     List(Box<FieldType>),
     Optionnal(Box<FieldType>),
@@ -94,7 +95,7 @@ impl FieldType {
             Self::Scalar(scalar)
         } else {
             let name = Name::from((name, graphql_path_span()));
-            Self::Custom { name }
+            Self::Custom { name, path: None }
         }
     }
     fn is_optionnal(&self) -> bool {
@@ -107,6 +108,16 @@ impl FieldType {
             }
             FieldType::List(field_type) => field_type.override_type(type_override),
             FieldType::Optionnal(field_type) => field_type.override_type(type_override),
+        }
+    }
+    fn add_path(&mut self, p: &Path) {
+        match self {
+            FieldType::Custom { path, .. } => {
+                path.replace(p.clone());
+            }
+            FieldType::Overriden(_) | FieldType::Scalar(_) => {}
+            FieldType::List(field_type) => field_type.add_path(p),
+            FieldType::Optionnal(field_type) => field_type.add_path(p),
         }
     }
 }
@@ -138,12 +149,17 @@ impl ToTokens for FieldType {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let span = graphql_path_span();
         match self {
-            FieldType::Custom { name } => {
+            FieldType::Custom { name, path } => {
+                if let Some(path) = path {
+                    tokens.extend(quote_spanned! {span=>#path::})
+                }
                 let name = name.to_type_ident();
                 tokens.extend(quote_spanned! {span=>#name})
             }
             FieldType::Scalar(scalar) => tokens.extend(quote_spanned! {span=>#scalar}),
-            FieldType::List(field_type) => tokens.extend(quote_spanned! {span=>Vec<#field_type>}),
+            FieldType::List(field_type) => {
+                tokens.extend(quote_spanned! {span=>::std::vec::Vec<#field_type>})
+            }
             FieldType::Optionnal(field_type) => {
                 tokens.extend(quote_spanned! {span=>::core::option::Option<#field_type>})
             }
@@ -605,6 +621,12 @@ impl Operation {
                 .expect("not empty"))
         }
     }
+    fn apply_type_module_path(&mut self, path: &Path) {
+        for arg in self.args.iter_mut() {
+            arg.field_type.add_path(path);
+        }
+        self.return_type.add_path(path);
+    }
 }
 impl From<graphql_parser::schema::Field<'_, String>> for Operation {
     fn from(value: graphql_parser::schema::Field<'_, String>) -> Self {
@@ -687,6 +709,12 @@ impl Operations {
                 .expect("not empty"))
         }
     }
+
+    fn apply_type_module_path(&mut self, path: &Path) {
+        for op in self.0.iter_mut() {
+            op.apply_type_module_path(path);
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -743,7 +771,8 @@ pub(super) struct GraphQLSchema {
 impl GraphQLSchema {
     pub(super) fn new(
         graphql_schema_path: LitStr,
-        overrides: OverrideParameters,
+        override_parameters: OverrideParameters,
+        custom_type_module: Option<Path>,
     ) -> Result<Self, syn::Error> {
         let mut queries = None;
         let mut mutations = None;
@@ -803,7 +832,7 @@ impl GraphQLSchema {
         let OverrideParameters {
             mut type_overrides,
             mut name_overrides,
-        } = overrides;
+        } = override_parameters;
 
         let mut errors = vec![];
         for definition in graphql_schema.definitions {
@@ -811,16 +840,20 @@ impl GraphQLSchema {
                 Definition::TypeDefinition(type_definition) => {
                     match type_definition {
                         TypeDefinition::Object(object_type) => {
-                            if let Some(sdt) = sd.schema_definition(&object_type.name) {
+                            if let Some(op_kind) = sd.schema_definition(&object_type.name) {
+                                // This is an Object defining operations
                                 let type_overrides = type_overrides.remove(&object_type.name);
                                 let mut ops = Operations::from(object_type);
+                                if let Some(ref custom_type_module) = custom_type_module {
+                                    ops.apply_type_module_path(custom_type_module);
+                                }
                                 if let Some(type_overrides) = type_overrides {
                                     match ops.apply_type_overrides(type_overrides) {
                                         Ok(_) => (),
                                         Err(e) => errors.push(e),
                                     };
                                 }
-                                match sdt {
+                                match op_kind {
                                     OperationKind::Query => {
                                         queries.replace(ops);
                                     }
@@ -832,6 +865,7 @@ impl GraphQLSchema {
                                     }
                                 }
                             } else {
+                                // This is an object defining a structure-style type
                                 let mut structure = Structure::from(object_type);
                                 if let Some(type_overrides) =
                                     type_overrides.remove(structure.name.orig())
@@ -902,33 +936,46 @@ impl GraphQLSchema {
             }
         }
 
-        if !type_overrides.is_empty() {
-            errors.extend(
-                type_overrides
-                    .into_values()
-                    .flat_map(|fos| fos.into_values())
-                    .flat_map(|fo| fo.0.into_iter().chain(fo.1.into_values()))
-                    .map(|to| {
-                        syn::Error::new(
-                            to.type_name().span(),
-                            format!("No type or input named `{}`", to.type_name()),
-                        )
-                    }),
-            );
-        }
-        if !name_overrides.is_empty() {
-            errors.extend(
-                name_overrides
-                    .into_values()
-                    .flat_map(|no| no.0.into_iter().chain(no.1.into_values()))
-                    .map(|no| {
-                        syn::Error::new(
-                            no.type_name().span(),
-                            format!("No type, enum or input named `{}`", no.type_name()),
-                        )
-                    }),
-            );
-        }
+        // Add an error for each un-matched type_override
+        errors.extend(
+            type_overrides
+                .into_values()
+                .flat_map(|field_type_overrides| field_type_overrides.into_values())
+                .flat_map(|field_type_override| {
+                    field_type_override
+                        .0
+                        .into_iter()
+                        .chain(field_type_override.1.into_values())
+                })
+                .map(|type_override| {
+                    syn::Error::new(
+                        type_override.type_name().span(),
+                        format!("No type or input named `{}`", type_override.type_name()),
+                    )
+                }),
+        );
+
+        // Add an error for each un-matched name_override
+        errors.extend(
+            name_overrides
+                .into_values()
+                .flat_map(|name_overrides| {
+                    name_overrides
+                        .0
+                        .into_iter()
+                        .chain(name_overrides.1.into_values())
+                })
+                .map(|name_override| {
+                    syn::Error::new(
+                        name_override.type_name().span(),
+                        format!(
+                            "No type, enum or input named `{}`",
+                            name_override.type_name()
+                        ),
+                    )
+                }),
+        );
+
         if errors.is_empty() {
             Ok(Self {
                 queries: queries.unwrap_or_default(),

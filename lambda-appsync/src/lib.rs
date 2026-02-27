@@ -110,11 +110,11 @@ pub use lambda_appsync_proc::make_types;
 pub use lambda_runtime;
 pub use serde;
 pub use serde_json;
+pub use tokio;
 
 #[cfg(feature = "compat")]
 mod compat {
     pub use aws_config;
-    pub use tokio;
 
     #[doc(inline)]
     pub use lambda_appsync_proc::appsync_lambda_main;
