@@ -416,6 +416,10 @@ impl ToTokens for Enum {
             .collect::<Vec<_>>();
         let error_message = format!("`{{}}` is an invalid value for enum {}", enum_name);
         let span = graphql_path_span();
+        let index_fct_arms = variants
+            .iter()
+            .enumerate()
+            .map(|(idx, var)| quote! {Self::#var => #idx});
         tokens.extend(quote_spanned! {span=>
             #[derive(Debug, Clone, Copy, ::lambda_appsync::serde::Serialize, ::lambda_appsync::serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
             pub enum #enum_name {
@@ -423,8 +427,13 @@ impl ToTokens for Enum {
             }
             impl #enum_name {
                 pub const COUNT: usize = #count;
-                pub fn all() -> [Self; Self::COUNT] {
+                pub const fn all() -> [Self; Self::COUNT] {
                     [#(Self::#variants,)*]
+                }
+                pub const fn index(self) -> usize {
+                    match self {
+                        #(#index_fct_arms,)*
+                    }
                 }
             }
             impl ::core::fmt::Display for #enum_name {
