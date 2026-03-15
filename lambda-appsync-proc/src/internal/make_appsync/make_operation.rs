@@ -1,5 +1,7 @@
 use proc_macro2::TokenStream as TokenStream2;
 use quote::ToTokens;
+#[cfg(feature = "log")]
+use syn::LitBool;
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input, LitStr, Path, Result, Token,
@@ -12,6 +14,8 @@ use super::{
 
 pub(super) enum MakeOperationParameter {
     TypeModule(Path),
+    #[cfg(feature = "log")]
+    ErrorLogging(bool),
 }
 impl OptionalParameter for MakeOperationParameter {
     fn try_parse_parameter(input: ParseStream) -> core::result::Result<Self, ParameterError> {
@@ -19,20 +23,35 @@ impl OptionalParameter for MakeOperationParameter {
         #[allow(clippy::match_single_binding)]
         match ident.to_string().as_str() {
             "type_module" => Ok(Self::TypeModule(input.parse()?)),
+            #[cfg(feature = "log")]
+            "error_logging" => Ok(Self::ErrorLogging(input.parse::<LitBool>()?.value())),
             // Unknown option
             _ => ident.unknown(),
         }
     }
 }
 
-#[derive(Default)]
 pub(super) struct MakeOperationParameters {
-    type_module: Option<Path>,
+    pub(super) type_module: Option<Path>,
+    #[cfg(feature = "log")]
+    pub(super) error_logging: bool,
+}
+impl Default for MakeOperationParameters {
+    fn default() -> Self {
+        Self {
+            type_module: None,
+            error_logging: true,
+        }
+    }
 }
 impl OptionalParameters<MakeOperationParameter> for MakeOperationParameters {
     fn set_param(&mut self, p: MakeOperationParameter) {
         match p {
             MakeOperationParameter::TypeModule(path) => self.type_module = Some(path),
+            #[cfg(feature = "log")]
+            MakeOperationParameter::ErrorLogging(error_logging) => {
+                self.error_logging = error_logging
+            }
         }
     }
 }
@@ -69,11 +88,8 @@ impl Parse for MakeOperation {
             parameters.try_parse_parameter(input)?;
         }
 
-        let graphql_schema = GraphQLSchema::new(
-            graphql_schema_path,
-            override_parameters,
-            parameters.type_module,
-        )?;
+        let graphql_schema =
+            GraphQLSchema::new(graphql_schema_path, override_parameters, Some(parameters))?;
 
         Ok(Self { graphql_schema })
     }

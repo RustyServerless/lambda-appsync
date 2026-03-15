@@ -6,6 +6,8 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::Path;
 use syn::{spanned::Spanned, LitStr};
 
+use crate::internal::make_appsync::MakeOperationParameters;
+
 use super::super::common::{Name, OperationKind};
 use super::overrides::{
     FieldTypeOverride, FieldTypeOverrides, OverrideParameters, TypeNameOverride, TypeOverride,
@@ -776,12 +778,13 @@ pub(super) struct GraphQLSchema {
     subscriptions: Operations,
     structures: Vec<Structure>,
     enums: Vec<Enum>,
+    make_operation_parameters: Option<MakeOperationParameters>,
 }
 impl GraphQLSchema {
     pub(super) fn new(
         graphql_schema_path: LitStr,
         override_parameters: OverrideParameters,
-        custom_type_module: Option<Path>,
+        make_operation_parameters: Option<MakeOperationParameters>,
     ) -> Result<Self, syn::Error> {
         let mut queries = None;
         let mut mutations = None;
@@ -853,7 +856,11 @@ impl GraphQLSchema {
                                 // This is an Object defining operations
                                 let type_overrides = type_overrides.remove(&object_type.name);
                                 let mut ops = Operations::from(object_type);
-                                if let Some(ref custom_type_module) = custom_type_module {
+                                if let Some(MakeOperationParameters {
+                                    type_module: Some(ref custom_type_module),
+                                    ..
+                                }) = make_operation_parameters
+                                {
                                     ops.apply_type_module_path(custom_type_module);
                                 }
                                 if let Some(type_overrides) = type_overrides {
@@ -992,6 +999,7 @@ impl GraphQLSchema {
                 subscriptions: subscriptions.unwrap_or_default(),
                 structures,
                 enums,
+                make_operation_parameters,
             })
         } else {
             Err(errors
@@ -1082,9 +1090,15 @@ impl GraphQLSchema {
         #[allow(unused_mut)]
         let mut log_lines = proc_macro2::TokenStream::new();
         #[cfg(feature = "log")]
-        log_lines.extend(quote_spanned! {span=>
-            ::lambda_appsync::log::error!("{e}");
-        });
+        if self
+            .make_operation_parameters
+            .as_ref()
+            .is_some_and(|p| p.error_logging)
+        {
+            log_lines.extend(quote_spanned! {span=>
+                ::lambda_appsync::log::error!("{e}");
+            });
+        }
 
         tokens.extend(quote_spanned! {span=>
             impl Operation {
