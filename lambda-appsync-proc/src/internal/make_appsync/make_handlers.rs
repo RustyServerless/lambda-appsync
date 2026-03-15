@@ -88,15 +88,42 @@ impl ToTokens for MakeHandlers {
         let operation = &self.operation_type;
         let mut batch_handler = TokenStream2::new();
         if self.batch {
+            let spawn_code = if cfg!(feature = "tracing") {
+                quote! {
+                    use ::tracing::Instrument;
+                    let handles = events
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, event)| {
+                            let operation = event.info.operation;
+                            ::lambda_appsync::tokio::spawn(
+                                Self::appsync_handler(event).instrument(
+                                    ::tracing::info_span!(
+                                        "AppsyncEvent",
+                                        "otel.name"=format!("AppsyncEvent #{index}"),
+                                        batch_index=index,
+                                        ?operation
+                                    )
+                                )
+                            )
+                        })
+                        .collect::<::std::vec::Vec<_>>();
+                }
+            } else {
+                quote! {
+                    let handles = events
+                        .into_iter()
+                        .map(|event| ::lambda_appsync::tokio::spawn(Self::appsync_handler(event)))
+                        .collect::<::std::vec::Vec<_>>();
+                }
+            };
             batch_handler.extend(quote! {
                 #[doc = "Handles a batch of [lambda_appsync::AppsyncEvent<Operation>] concurrently."]
                 async fn appsync_batch_handler(
                     events: ::std::vec::Vec<::lambda_appsync::AppsyncEvent<#operation>>
                 ) -> ::std::vec::Vec<::lambda_appsync::AppsyncResponse> {
-                    let handles = events
-                        .into_iter()
-                        .map(|e| ::lambda_appsync::tokio::spawn(Self::appsync_handler(e)))
-                        .collect::<::std::vec::Vec<_>>();
+
+                    #spawn_code
 
                     let mut results = ::std::vec::Vec::new();
                     for h in handles {
@@ -125,6 +152,19 @@ impl ToTokens for MakeHandlers {
                     event: ::lambda_appsync::AppsyncEvent<#operation>
                 ) -> impl std::future::Future<Output = ::lambda_appsync::AppsyncResponse> + Send + 'static {
                     event.info.operation.execute(event)
+                }
+            }
+        } else if cfg!(feature = "tracing") {
+            quote! {
+                async fn appsync_handler(event: ::lambda_appsync::AppsyncEvent<#operation>) -> ::lambda_appsync::AppsyncResponse {
+                    let operation = event.info.operation;
+                    event.info.operation.execute(event).instrument(
+                        ::tracing::info_span!(
+                            "AppsyncEvent",
+                            "otel.name"=format!("AppsyncEvent"),
+                            ?operation
+                        )
+                    ).await
                 }
             }
         } else {
