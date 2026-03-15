@@ -378,6 +378,34 @@ impl AppsyncResponse {
     pub fn unauthorized() -> Self {
         AppsyncError::new("Unauthorized", "This operation cannot be authorized").into()
     }
+
+    /// Returns a reference to the response data, if present
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use lambda_appsync::AppsyncResponse;
+    /// # use serde_json::json;
+    /// let response = AppsyncResponse::from(json!({"user": "Alice"}));
+    /// assert!(response.data().is_some());
+    /// ```
+    pub fn data(&self) -> Option<&Value> {
+        self.data.as_ref()
+    }
+
+    /// Returns a reference to the response error, if present
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use lambda_appsync::{AppsyncResponse, AppsyncError};
+    /// let error = AppsyncError::new("NotFound", "User not found");
+    /// let response = AppsyncResponse::from(error);
+    /// assert!(response.error().is_some());
+    /// ```
+    pub fn error(&self) -> Option<&AppsyncError> {
+        self.error.as_ref()
+    }
 }
 
 impl From<Value> for AppsyncResponse {

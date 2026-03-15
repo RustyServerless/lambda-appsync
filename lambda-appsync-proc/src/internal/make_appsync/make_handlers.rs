@@ -161,7 +161,6 @@ impl ToTokens for MakeHandlers {
                     event.info.operation.execute(event).instrument(
                         ::tracing::info_span!(
                             "AppsyncEvent",
-                            "otel.name"=format!("AppsyncEvent"),
                             ?operation
                         )
                     ).await
