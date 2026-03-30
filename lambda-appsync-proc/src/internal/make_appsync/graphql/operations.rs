@@ -12,13 +12,12 @@ impl Operation {
     }
     fn default_op(&self, kind: OperationKind) -> proc_macro2::TokenStream {
         let fct_name = self.name.to_prefixed_fct_ident(kind.fct_prefix());
-        let span = graphql_path_span();
         let return_type = match kind {
             OperationKind::Query | OperationKind::Mutation => {
                 let return_type = &self.return_type;
-                quote_spanned! {span=>#return_type}
+                quote! {#return_type}
             }
-            OperationKind::Subscription => quote_spanned! {span=>
+            OperationKind::Subscription => quote! {
                 ::core::option::Option<::lambda_appsync::subscription_filters::FilterGroup>
             },
         };
@@ -26,36 +25,34 @@ impl Operation {
             OperationKind::Query | OperationKind::Mutation => {
                 let unimplemented_message =
                     format!("{kind} `{}` is unimplemented", self.name.orig());
-                quote_spanned! {span=>
+                quote! {
                     ::core::result::Result::Err(::lambda_appsync::AppsyncError::new(
                         "Unimplemented",
                         #unimplemented_message,
                     ))
                 }
             }
-            OperationKind::Subscription => quote_spanned! {span=>
+            OperationKind::Subscription => quote! {
                 ::core::result::Result::Ok(None)
             },
         };
-        quote_spanned! {span=>
+        quote! {
             async fn #fct_name(_event: ::lambda_appsync::AppsyncEvent<Operation>) -> ::core::result::Result<#return_type, ::lambda_appsync::AppsyncError> {
                 #default_body
             }
         }
     }
     fn execute_match_arm(&self, kind: OperationKind) -> proc_macro2::TokenStream {
-        let span = graphql_path_span();
-        let operation_enum_name = kind.operation_enum_name(span);
+        let operation_enum_name = kind.operation_enum_name();
         let variant = self.name.to_type_ident();
         let fct_name = self.name.to_prefixed_fct_ident(kind.fct_prefix());
-        quote_spanned! {span=>
+        quote! {
             #operation_enum_name::#variant => Operation::#fct_name(event)
             .await
             .map(::lambda_appsync::res_to_json)
         }
     }
     fn argument_extractor(&self, with_event: bool) -> proc_macro2::TokenStream {
-        let span = graphql_path_span();
         let params_types = self.args.iter().map(|arg| &arg.field_type);
         let param_strs = self.args.iter().map(|arg| arg.name.orig());
 
@@ -87,7 +84,7 @@ impl Operation {
                 let mut args = event.args.take();
             }
         };
-        quote_spanned! {span=>
+        quote! {
             pub(crate) fn operation_arguments(event: &mut ::lambda_appsync::AppsyncEvent<Operation>) -> ::core::result::Result<#return_type, ::lambda_appsync::AppsyncError> {
                 #extract_args
                  Ok(#returned_tuple)
@@ -110,7 +107,7 @@ impl Operation {
                     ::core::result::Result<#return_type, ::lambda_appsync::AppsyncError>
                 }
             }
-            OperationKind::Subscription => quote_spanned! {graphql_path_span()=>
+            OperationKind::Subscription => quote! {
                 ::core::result::Result<::core::option::Option<::lambda_appsync::subscription_filters::FilterGroup>, ::lambda_appsync::AppsyncError>
             },
         };

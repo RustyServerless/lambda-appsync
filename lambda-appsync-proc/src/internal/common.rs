@@ -254,6 +254,125 @@ impl Name {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- CaseType::case ---
+
+    #[test]
+    fn case_type_case_standard_cases() {
+        assert_eq!(CaseType::case("camelCase"), CaseType::Camel);
+        assert_eq!(CaseType::case("PascalCase"), CaseType::Pascal);
+        assert_eq!(CaseType::case("snake_case"), CaseType::Snake);
+        assert_eq!(CaseType::case("UPPER_CASE"), CaseType::Upper);
+
+        // Single lowercase word → Snake
+        assert_eq!(CaseType::case("hello"), CaseType::Snake);
+        // Single uppercase word → Upper
+        assert_eq!(CaseType::case("HELLO"), CaseType::Upper);
+        // Single capitalized word (no lowercase after first) → Upper
+        // Actually "Hello" has lowercase chars after H → Pascal
+        assert_eq!(CaseType::case("Hello"), CaseType::Pascal);
+    }
+
+    #[test]
+    fn case_type_case_single_chars() {
+        // Single lowercase char → Snake
+        assert_eq!(CaseType::case("a"), CaseType::Snake);
+        // Single uppercase char → Upper (no subsequent chars to make it Pascal)
+        assert_eq!(CaseType::case("A"), CaseType::Upper);
+    }
+
+    // --- Name::from (case decomposition) ---
+
+    #[test]
+    fn name_from_camel_decomposition() {
+        let name = Name::from("myFieldName".to_string());
+        // All four inputs should round-trip to the same PascalCase
+        assert_eq!(name.to_type_ident().to_string(), "MyFieldName");
+    }
+
+    #[test]
+    fn name_from_pascal_decomposition() {
+        let name = Name::from("MyFieldName".to_string());
+        assert_eq!(name.to_type_ident().to_string(), "MyFieldName");
+    }
+
+    #[test]
+    fn name_from_snake_decomposition() {
+        let name = Name::from("my_field_name".to_string());
+        assert_eq!(name.to_type_ident().to_string(), "MyFieldName");
+    }
+
+    #[test]
+    fn name_from_upper_decomposition() {
+        let name = Name::from("MY_FIELD_NAME".to_string());
+        assert_eq!(name.to_type_ident().to_string(), "MyFieldName");
+    }
+
+    // --- Name::to_case (via public methods) ---
+
+    #[test]
+    fn name_to_case_pascal_and_snake() {
+        let name = Name::from("myFieldName".to_string());
+        // Pascal output
+        assert_eq!(name.to_type_ident().to_string(), "MyFieldName");
+        // Snake output
+        assert_eq!(name.to_var_ident().to_string(), "my_field_name");
+    }
+
+    #[test]
+    fn name_to_case_override() {
+        let mut name = Name::from("myFieldName".to_string());
+        name.override_name("CustomName".to_string());
+        // Override replaces all conversions
+        assert_eq!(name.to_type_ident().to_string(), "CustomName");
+        assert_eq!(name.to_var_ident().to_string(), "CustomName");
+    }
+
+    // --- Name::to_var_ident (keyword escaping) ---
+
+    #[test]
+    fn to_var_ident_keyword_escaping() {
+        // Regular keyword → r# prefix
+        let name = Name::from("async".to_string());
+        assert_eq!(name.to_var_ident().to_string(), "r#async");
+
+        // Non-keyword → no escaping
+        let name = Name::from("hello".to_string());
+        assert_eq!(name.to_var_ident().to_string(), "hello");
+    }
+
+    #[test]
+    fn to_var_ident_inescapable_keywords() {
+        // Inescapable keywords → r_ prefix
+        let name = Name::from("self".to_string());
+        assert_eq!(name.to_var_ident().to_string(), "r_self");
+
+        let name = Name::from("crate".to_string());
+        assert_eq!(name.to_var_ident().to_string(), "r_crate");
+
+        let name = Name::from("super".to_string());
+        assert_eq!(name.to_var_ident().to_string(), "r_super");
+
+        // Multi-word name containing a keyword word → no escaping (multi-word check)
+        let name = Name::from("selfName".to_string());
+        assert_eq!(name.to_var_ident().to_string(), "self_name");
+    }
+
+    // --- Name::to_prefixed_fct_ident ---
+
+    #[test]
+    fn to_prefixed_fct_ident_creates_prefixed_snake_case() {
+        let name = Name::from("createPlayer".to_string());
+        assert_eq!(
+            name.to_prefixed_fct_ident("mutation").to_string(),
+            "mutation_create_player"
+        );
+    }
+}
+
 /// The kind of a GraphQL operation.
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum OperationKind {
@@ -288,11 +407,11 @@ impl OperationKind {
         }
     }
     /// Returns the generated enum name for this operation kind (e.g. `QueryField`).
-    pub(crate) fn operation_enum_name(self, span: Span) -> proc_macro2::Ident {
+    pub(crate) fn operation_enum_name(self) -> proc_macro2::Ident {
         match self {
-            Self::Query => proc_macro2::Ident::new("QueryField", span),
-            Self::Mutation => proc_macro2::Ident::new("MutationField", span),
-            Self::Subscription => proc_macro2::Ident::new("SubscriptionField", span),
+            Self::Query => proc_macro2::Ident::new("QueryField", Span::call_site()),
+            Self::Mutation => proc_macro2::Ident::new("MutationField", Span::call_site()),
+            Self::Subscription => proc_macro2::Ident::new("SubscriptionField", Span::call_site()),
         }
     }
 }

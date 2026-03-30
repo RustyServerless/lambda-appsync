@@ -81,11 +81,7 @@ trait Handlers {
 }
 ```
 
-When the `tracing` feature is enabled and `batch = true`, the default `appsync_batch_handler`
-wraps each spawned task in a `tracing::info_span!("AppsyncEvent", ...)` for observability.
-
-When the `tracing` feature is enabled and `batch = false`, the default `appsync_handler`
-wraps the execution in a `tracing::info_span!("AppsyncEvent", ...)`.
+When the `tracing` feature is enabled, the default Handlers trait methods are instrumented for observability.
 
 ## The `DefaultHandlers` struct
 

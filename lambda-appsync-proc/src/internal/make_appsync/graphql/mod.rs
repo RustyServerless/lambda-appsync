@@ -5,10 +5,8 @@ use fields::*;
 use operations::*;
 use types::*;
 
-use std::cell::RefCell;
-
 use graphql_parser::schema::{Definition, TypeDefinition};
-use proc_macro2::Span;
+
 use quote::{quote, quote_spanned, ToTokens};
 use syn::Path;
 use syn::{spanned::Spanned, Ident, LitStr};
@@ -17,15 +15,6 @@ use crate::internal::make_appsync::{MakeOperationParameters, MakeTypesParameters
 
 use super::super::common::{Name, OperationKind};
 use super::overrides::{FieldTypeOverride, FieldTypeOverrides, OverrideParameters, TypeOverride};
-
-thread_local! {
-    /// The span of the GraphQL schema path literal, used to attribute generated tokens to the correct source location.
-    static GRAPHQL_PATH_SPAN: RefCell<Span> = RefCell::new(Span::call_site());
-}
-/// Returns the current GraphQL schema path span for use in generated token streams.
-fn graphql_path_span() -> Span {
-    GRAPHQL_PATH_SPAN.with(|s| *s.borrow())
-}
 
 /// The root type names for each operation kind, parsed from the GraphQL `schema { ... }` block.
 ///
@@ -101,10 +90,7 @@ impl GraphQLSchema {
         let full_path = if std::path::Path::new(&path_value).is_relative() {
             std::env::current_dir()
                 .map_err(|e| {
-                    syn::Error::new(
-                        graphql_schema_path.span(),
-                        format!("Could not get current directory: {e}"),
-                    )
+                    syn::Error::new(span, format!("Could not get current directory: {e}"))
                 })?
                 .join(&path_value)
         } else {
@@ -112,7 +98,7 @@ impl GraphQLSchema {
         };
         let schema_str = std::fs::read_to_string(&full_path).map_err(|e| {
             syn::Error::new(
-                graphql_schema_path.span(),
+                span,
                 format!(
                     "Could not open GraphQL schema file at '{}' ({e})",
                     full_path.display()
@@ -122,14 +108,9 @@ impl GraphQLSchema {
 
         let mut graphql_schema = graphql_parser::parse_schema(&schema_str)
             .map_err(|e| {
-                syn::Error::new(
-                    graphql_schema_path.span(),
-                    format!("Could not parse GraphQL schema file ({e})",),
-                )
+                syn::Error::new(span, format!("Could not parse GraphQL schema file ({e})",))
             })?
             .into_static();
-
-        GRAPHQL_PATH_SPAN.replace(span);
 
         let sd = if let Some(index) = graphql_schema
             .definitions
@@ -303,27 +284,26 @@ impl GraphQLSchema {
     }
     fn enums_to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let enums = self.enums.iter();
-        let span = graphql_path_span();
-        tokens.extend(quote_spanned! {span=>
+
+        tokens.extend(quote! {
             #(#enums)*
         });
     }
     fn structs_to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let structures = self.structures.iter();
-        let span = graphql_path_span();
-        tokens.extend(quote_spanned! {span=>
+
+        tokens.extend(quote! {
             #(#structures)*
         });
     }
     fn operation_to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let span = graphql_path_span();
-        let query_field_name = OperationKind::Query.operation_enum_name(span);
+        let query_field_name = OperationKind::Query.operation_enum_name();
         let query_field_variants = self.queries.variants_iter();
-        let mutation_field_name = OperationKind::Mutation.operation_enum_name(span);
+        let mutation_field_name = OperationKind::Mutation.operation_enum_name();
         let mutation_field_variants = self.mutations.variants_iter();
-        let subscription_field_name = OperationKind::Subscription.operation_enum_name(span);
+        let subscription_field_name = OperationKind::Subscription.operation_enum_name();
         let subscription_field_variants = self.subscriptions.variants_iter();
-        tokens.extend(quote_spanned! {span=>
+        tokens.extend(quote! {
             #[derive(Debug, Clone, Copy, ::lambda_appsync::serde::Deserialize)]
             #[serde(rename_all = "camelCase")]
             pub enum #query_field_name {
@@ -358,7 +338,7 @@ impl GraphQLSchema {
         let subscription_field_default_ops = self
             .subscriptions
             .default_op_iter(OperationKind::Subscription);
-        tokens.extend(quote_spanned! {graphql_path_span()=>
+        tokens.extend(quote! {
             pub(super) trait DefaultOperations {
                 #(#query_field_default_ops)*
                 #(#mutation_field_default_ops)*
@@ -377,18 +357,16 @@ impl GraphQLSchema {
             .subscriptions
             .execute_match_arm_iter(OperationKind::Subscription);
 
-        let span = graphql_path_span();
-
         #[allow(unused_mut)]
         let mut log_lines = proc_macro2::TokenStream::new();
         #[cfg(feature = "log")]
         if self.make_operation_parameters.error_logging {
-            log_lines.extend(quote_spanned! {span=>
+            log_lines.extend(quote! {
                 ::lambda_appsync::log::error!("{e}");
             });
         }
 
-        tokens.extend(quote_spanned! {span=>
+        tokens.extend(quote! {
             impl Operation {
                 #[doc = "Will retrieve the [`Operation`] for the [`AppsyncEvent`](::lambda_appsync::AppsyncEvent)"]
                 #[doc = "and extract the API call parameters to call the user code marked with the correspoding [`macro@appsync_operation`](crate::appsync_operation)"]

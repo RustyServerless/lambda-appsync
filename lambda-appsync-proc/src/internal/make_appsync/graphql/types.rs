@@ -198,7 +198,7 @@ impl Structure {
 }
 impl From<graphql_parser::schema::ObjectType<'_, String>> for Structure {
     fn from(value: graphql_parser::schema::ObjectType<'_, String>) -> Self {
-        let name = Name::from((value.name, graphql_path_span()));
+        let name = Name::from(value.name);
         let fields = value.fields.into_iter().map(Field::from).collect();
         Self {
             name,
@@ -220,7 +220,6 @@ impl From<graphql_parser::schema::InputObjectType<'_, String>> for Structure {
 }
 impl ToTokens for Structure {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let span = graphql_path_span();
         let derive = self.derives.derive_from_default(quote! {
             Debug, Clone, ::lambda_appsync::serde::Serialize, ::lambda_appsync::serde::Deserialize,
         });
@@ -229,7 +228,7 @@ impl ToTokens for Structure {
             .fields
             .iter()
             .map(|f| FieldContext::new(f, self.derives.includes_serde()));
-        tokens.extend(quote_spanned! {span=>
+        tokens.extend(quote! {
             #derive
             pub struct #struct_name {
                 #(#fields,)*
@@ -304,11 +303,11 @@ impl Enum {
 }
 impl From<graphql_parser::schema::EnumType<'_, String>> for Enum {
     fn from(value: graphql_parser::schema::EnumType<'_, String>) -> Self {
-        let name = Name::from((value.name, graphql_path_span()));
+        let name = Name::from(value.name);
         let variants = value
             .values
             .into_iter()
-            .map(|v| Name::from((v.name, graphql_path_span())))
+            .map(|v| Name::from(v.name))
             .collect();
         Self {
             name,
@@ -331,7 +330,6 @@ impl ToTokens for Enum {
             .map(|n| n.to_type_ident())
             .collect::<Vec<_>>();
         let error_message = format!("`{{}}` is an invalid value for enum {}", enum_name);
-        let span = graphql_path_span();
         let index_fct_arms = variants
             .iter()
             .enumerate()
@@ -359,7 +357,7 @@ impl ToTokens for Enum {
                 }
             });
 
-        tokens.extend(quote_spanned! {span=>
+        tokens.extend(quote! {
             #derive
             pub enum #enum_name {
                 #(#rendered_variants,)*
@@ -377,7 +375,7 @@ impl ToTokens for Enum {
             }
         });
         if self.derives.default_traits {
-            tokens.extend(quote_spanned! {span=>
+            tokens.extend(quote! {
                 impl ::core::fmt::Display for #enum_name {
                     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                         match self {

@@ -44,22 +44,21 @@ impl TryFrom<&str> for Scalar {
 }
 impl ToTokens for Scalar {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let span = graphql_path_span();
         tokens.extend(match self {
-            Scalar::String => quote_spanned! {span=>String},
-            Scalar::ID => quote_spanned! {span=>::lambda_appsync::ID},
-            Scalar::Int => quote_spanned! {span=>i32},
-            Scalar::Float => quote_spanned! {span=>f64},
-            Scalar::Boolean => quote_spanned! {span=>bool},
-            Scalar::AWSEmail => quote_spanned! {span=>::lambda_appsync::AWSEmail},
-            Scalar::AWSPhone => quote_spanned! {span=>::lambda_appsync::AWSPhone},
-            Scalar::AWSTimestamp => quote_spanned! {span=>::lambda_appsync::AWSTimestamp},
-            Scalar::AWSDate => quote_spanned! {span=>::lambda_appsync::AWSDate},
-            Scalar::AWSTime => quote_spanned! {span=>::lambda_appsync::AWSTime},
-            Scalar::AWSDateTime => quote_spanned! {span=>::lambda_appsync::AWSDateTime},
-            Scalar::AWSJSON => quote_spanned! {span=>::lambda_appsync::serde_json::Value},
-            Scalar::AWSURL => quote_spanned! {span=>::lambda_appsync::AWSUrl},
-            Scalar::AWSIPAddress => quote_spanned! {span=>::core::net::IpAddr},
+            Scalar::String => quote! {String},
+            Scalar::ID => quote! {::lambda_appsync::ID},
+            Scalar::Int => quote! {i32},
+            Scalar::Float => quote! {f64},
+            Scalar::Boolean => quote! {bool},
+            Scalar::AWSEmail => quote! {::lambda_appsync::AWSEmail},
+            Scalar::AWSPhone => quote! {::lambda_appsync::AWSPhone},
+            Scalar::AWSTimestamp => quote! {::lambda_appsync::AWSTimestamp},
+            Scalar::AWSDate => quote! {::lambda_appsync::AWSDate},
+            Scalar::AWSTime => quote! {::lambda_appsync::AWSTime},
+            Scalar::AWSDateTime => quote! {::lambda_appsync::AWSDateTime},
+            Scalar::AWSJSON => quote! {::lambda_appsync::serde_json::Value},
+            Scalar::AWSURL => quote! {::lambda_appsync::AWSUrl},
+            Scalar::AWSIPAddress => quote! {::core::net::IpAddr},
         })
     }
 }
@@ -82,7 +81,7 @@ impl FieldType {
         if let Ok(scalar) = Scalar::try_from(name.as_str()) {
             Self::Scalar(scalar)
         } else {
-            let name = Name::from((name, graphql_path_span()));
+            let name = Name::from(name);
             Self::Custom { name, path: None }
         }
     }
@@ -135,23 +134,20 @@ impl From<graphql_parser::schema::Type<'_, String>> for FieldType {
 }
 impl ToTokens for FieldType {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let span = graphql_path_span();
         match self {
             FieldType::Custom { name, path } => {
                 if let Some(path) = path {
-                    tokens.extend(quote_spanned! {span=>#path::})
+                    tokens.extend(quote! {#path::})
                 }
                 let name = name.to_type_ident();
-                tokens.extend(quote_spanned! {span=>#name})
+                tokens.extend(quote! {#name})
             }
-            FieldType::Scalar(scalar) => tokens.extend(quote_spanned! {span=>#scalar}),
-            FieldType::List(field_type) => {
-                tokens.extend(quote_spanned! {span=>::std::vec::Vec<#field_type>})
-            }
+            FieldType::Scalar(scalar) => tokens.extend(quote! {#scalar}),
+            FieldType::List(field_type) => tokens.extend(quote! {::std::vec::Vec<#field_type>}),
             FieldType::Optionnal(field_type) => {
-                tokens.extend(quote_spanned! {span=>::core::option::Option<#field_type>})
+                tokens.extend(quote! {::core::option::Option<#field_type>})
             }
-            FieldType::Overriden(ty) => tokens.extend(quote_spanned! {span=>#ty}),
+            FieldType::Overriden(ty) => tokens.extend(quote! {#ty}),
         }
     }
 }
@@ -163,14 +159,14 @@ pub(super) struct Field {
 }
 impl From<graphql_parser::schema::Field<'_, String>> for Field {
     fn from(value: graphql_parser::schema::Field<'_, String>) -> Self {
-        let name = Name::from((value.name, graphql_path_span()));
+        let name = Name::from(value.name);
         let field_type = FieldType::from(value.field_type);
         Self { name, field_type }
     }
 }
 impl From<graphql_parser::schema::InputValue<'_, String>> for Field {
     fn from(value: graphql_parser::schema::InputValue<'_, String>) -> Self {
-        let name = Name::from((value.name, graphql_path_span()));
+        let name = Name::from(value.name);
         let field_type = FieldType::from(value.value_type);
         Self { name, field_type }
     }
@@ -195,23 +191,23 @@ impl ToTokens for FieldContext<'_> {
 
         let field_type = &field.field_type;
         let mut serde_options = vec![];
-        let span = graphql_path_span();
+
         if name != orig_name {
-            serde_options.push(quote_spanned! {span=>
+            serde_options.push(quote! {
                 rename = #orig_name
             });
         }
         if field_type.is_optionnal() {
-            serde_options.push(quote_spanned! {span=>
+            serde_options.push(quote! {
                 default, skip_serializing_if = "Option::is_none"
             });
         }
         if !serde_options.is_empty() && self.with_serde {
-            tokens.extend(quote_spanned! {span=>
+            tokens.extend(quote! {
                 #[serde(#(#serde_options),*)]
             })
         }
-        tokens.extend(quote_spanned! {span=>
+        tokens.extend(quote! {
             pub #name: #field_type
         });
     }

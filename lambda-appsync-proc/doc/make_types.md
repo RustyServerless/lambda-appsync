@@ -82,9 +82,8 @@ implemented for that type, giving you the opportunity to implement them yourself
 of this setting:
 
 - `serde::Serialize` **must** be implemented on any type used as a return type of a Query or
-  Mutation operation (the `execute` method serializes the response).
-- `serde::Deserialize` **must** be implemented on any `input` type used as an operation argument
-  (arguments are deserialized from the incoming event).
+  Mutation operation.
+- `serde::Deserialize` **must** be implemented on any `input` type used as an operation argument.
 
 You are free to disable the default implementations, but you must provide alternative ones —
 whether via `derive` entries, manual `impl` blocks, or any other means.
@@ -162,10 +161,7 @@ Each generated enum also gets:
 - `const fn all() -> [Self; Self::COUNT]` — array of all variants
 - `const fn index(self) -> usize` — index of the variant (useful for array indexing)
 - `Display` impl (when `default_traits` is `true`, displays the original GraphQL name)
-- `FromStr` impl (when `default_traits` is `true`, parses from the original GraphQL name, returns `AppsyncError` on failure)
-
-Optional fields get `#[serde(default, skip_serializing_if = "Option::is_none")]`.
-Fields whose Rust name differs from the GraphQL name get `#[serde(rename = "originalName")]`.
+- `FromStr` impl (when `default_traits` is `true`, parses from the original GraphQL name)
 
 # GraphQL to Rust Type Mapping
 
