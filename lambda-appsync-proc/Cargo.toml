@@ -32,5 +32,5 @@ trybuild = { workspace = true }
 default = ["log", "env_logger", "tracing", "compat"]
 compat = []
 log = []
-env_logger = ["compat"]
+env_logger = []
 tracing = []
