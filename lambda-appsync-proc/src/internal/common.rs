@@ -1,11 +1,16 @@
 use proc_macro2::Span;
 
+/// Identifier naming convention used to split and reconstruct names.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum CaseType {
-    Camel,  // Lowercase separated by Uppercase letters, first letter lower
-    Pascal, // Lowercase separated by Uppercase letters, first letter uppercase
-    Snake,  // Lowercase separated by _
-    Upper,  // All uppercase separated by _
+    /// Lowercase words joined by uppercase first letters, starting lowercase (e.g. `myFieldName`).
+    Camel,
+    /// Lowercase words joined by uppercase first letters, starting uppercase (e.g. `MyTypeName`).
+    Pascal,
+    /// Lowercase words separated by underscores (e.g. `my_field_name`).
+    Snake,
+    /// All-uppercase words separated by underscores (e.g. `MY_CONSTANT`).
+    Upper,
 }
 impl CaseType {
     fn case(s: &str) -> Self {
@@ -33,10 +38,11 @@ impl CaseType {
     }
 }
 
-// Word is always stored as lowercase
+/// A single lowercase word, used as the atomic unit of a [`Name`].
 #[derive(Debug)]
 pub(crate) struct Word(String);
 impl Word {
+    /// Returns the word with its first character uppercased.
     pub(crate) fn capitalize(&self) -> String {
         let mut chars = self.0.chars();
         match chars.next() {
@@ -44,6 +50,7 @@ impl Word {
             None => String::new(),
         }
     }
+    /// Returns the word converted to all uppercase.
     pub(crate) fn to_uppercase(&self) -> String {
         self.0.to_uppercase()
     }
@@ -60,6 +67,10 @@ impl std::borrow::Borrow<str> for Word {
     }
 }
 
+/// A parsed identifier name that can be converted to any [`CaseType`].
+///
+/// Stores the original string, its source span, and the decomposed words for case conversion.
+/// An optional override replaces all case conversions with a fixed string.
 #[derive(Debug)]
 pub(crate) struct Name {
     orig: String,
@@ -112,15 +123,18 @@ impl From<(String, Span)> for Name {
     }
 }
 impl Name {
+    /// Sets a fixed override string that replaces all case conversions.
     pub(crate) fn override_name(&mut self, name: String) {
         self.name_override.replace(name);
     }
+    /// Returns the original unparsed name string.
     pub(crate) fn orig(&self) -> &str {
         &self.orig
     }
     // pub(crate) fn set_span(&mut self, span: Span) {
     //     self.span = Some(span);
     // }
+    /// Converts the name to the given case, or returns the override if set.
     fn to_case(&self, case: CaseType) -> String {
         if let Some(ref name_override) = self.name_override {
             name_override.clone()
@@ -146,6 +160,7 @@ impl Name {
             }
         }
     }
+    /// Returns a PascalCase [`proc_macro2::Ident`] suitable for use as a type name.
     pub(crate) fn to_type_ident(&self) -> proc_macro2::Ident {
         proc_macro2::Ident::new(&self.to_case(CaseType::Pascal), self.span)
     }
@@ -230,6 +245,7 @@ impl Name {
             proc_macro2::Ident::new(&ident_str, self.span)
         }
     }
+    /// Returns a snake_case [`proc_macro2::Ident`] prefixed with `prefix_`.
     pub(crate) fn to_prefixed_fct_ident(&self, prefix: &str) -> proc_macro2::Ident {
         proc_macro2::Ident::new(
             &format!("{prefix}_{}", self.to_case(CaseType::Snake)),
@@ -238,6 +254,7 @@ impl Name {
     }
 }
 
+/// The kind of a GraphQL operation.
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum OperationKind {
     Query,
@@ -254,6 +271,7 @@ impl core::fmt::Display for OperationKind {
     }
 }
 impl OperationKind {
+    /// Returns the snake_case prefix used to name handler functions (e.g. `"query"`).
     pub(crate) fn fct_prefix(self) -> &'static str {
         match self {
             Self::Query => "query",
@@ -261,6 +279,7 @@ impl OperationKind {
             Self::Subscription => "subscription",
         }
     }
+    /// Returns the plural module name used in the generated `__operations` module (e.g. `"queries"`).
     pub(crate) fn module_name(self) -> &'static str {
         match self {
             Self::Query => "queries",
@@ -268,6 +287,7 @@ impl OperationKind {
             Self::Subscription => "subscriptions",
         }
     }
+    /// Returns the generated enum name for this operation kind (e.g. `QueryField`).
     pub(crate) fn operation_enum_name(self, span: Span) -> proc_macro2::Ident {
         match self {
             Self::Query => proc_macro2::Ident::new("QueryField", span),

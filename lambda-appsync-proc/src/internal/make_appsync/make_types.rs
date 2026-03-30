@@ -1,8 +1,11 @@
+use std::collections::{HashMap, HashSet};
+
 use proc_macro2::TokenStream as TokenStream2;
 use quote::ToTokens;
 use syn::{
+    ext::IdentExt,
     parse::{Parse, ParseStream},
-    parse_macro_input, LitStr, Result, Token,
+    parse_macro_input, Ident, LitBool, LitStr, Path, Result, Token,
 };
 
 use super::{
@@ -10,26 +13,92 @@ use super::{
     GraphQLSchema, OverrideParameters,
 };
 
-pub(super) enum MakeTypesParameter {}
+pub(super) struct DeriveAddition {
+    type_name: Ident,
+    trait_derive_macro: Path,
+}
+impl Parse for DeriveAddition {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let type_name = input.call(Ident::parse_any)?;
+        _ = input.parse::<syn::Token![:]>()?;
+        let trait_derive_macro = input
+            .parse()
+            .map_err(|e| syn::Error::new(e.span(), "Expected a trait Derive macro"))?;
+        Ok(Self {
+            type_name,
+            trait_derive_macro,
+        })
+    }
+}
+
+pub(super) struct NoDefaultDeriveModifier {
+    type_name: Ident,
+    default_traits: bool,
+}
+impl Parse for NoDefaultDeriveModifier {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let type_name = input.call(Ident::parse_any)?;
+        _ = input.parse::<syn::Token![:]>()?;
+        let default_traits = input.parse::<LitBool>()?.value;
+        Ok(Self {
+            type_name,
+            default_traits,
+        })
+    }
+}
+
+/// A single parsed parameter for the `make_types!` macro.
+///
+/// Currently empty — reserved for future parameters.
+pub(super) enum MakeTypesParameter {
+    Derive(DeriveAddition),
+    DefaultDerivations(NoDefaultDeriveModifier),
+}
 impl OptionalParameter for MakeTypesParameter {
     fn try_parse_parameter(input: ParseStream) -> core::result::Result<Self, ParameterError> {
         let ident = Self::parse_ident(input)?;
         #[allow(clippy::match_single_binding)]
         match ident.to_string().as_str() {
+            "derive" => Ok(Self::Derive(input.parse()?)),
+            "default_traits" => Ok(Self::DefaultDerivations(input.parse()?)),
             // Unknown option
             _ => ident.unknown(),
         }
     }
 }
 
+/// Accumulated parameters for the `make_types!` macro after parsing.
 #[derive(Default)]
-pub(super) struct MakeTypesParameters {}
+pub(super) struct MakeTypesParameters {
+    pub(super) add_derivations: HashMap<String, Vec<Path>>,
+    pub(super) no_default_traits: HashSet<String>,
+}
+
 impl OptionalParameters<MakeTypesParameter> for MakeTypesParameters {
     fn set_param(&mut self, parameter: MakeTypesParameter) {
-        match parameter {}
+        match parameter {
+            MakeTypesParameter::Derive(DeriveAddition {
+                type_name,
+                trait_derive_macro,
+            }) => {
+                self.add_derivations
+                    .entry(type_name.to_string())
+                    .or_default()
+                    .push(trait_derive_macro);
+            }
+            MakeTypesParameter::DefaultDerivations(NoDefaultDeriveModifier {
+                type_name,
+                default_traits,
+            }) => {
+                if !default_traits {
+                    self.no_default_traits.insert(type_name.to_string());
+                }
+            }
+        }
     }
 }
 
+/// Parsed input for the `make_types!` macro, generating only the GraphQL struct and enum types.
 struct MakeTypes {
     graphql_schema: GraphQLSchema,
 }
@@ -62,7 +131,12 @@ impl Parse for MakeTypes {
             parameters.try_parse_parameter(input)?;
         }
 
-        let graphql_schema = GraphQLSchema::new(graphql_schema_path, override_parameters, None)?;
+        let graphql_schema = GraphQLSchema::new(
+            graphql_schema_path,
+            override_parameters,
+            parameters,
+            Default::default(),
+        )?;
 
         Ok(Self { graphql_schema })
     }
@@ -74,6 +148,7 @@ impl ToTokens for MakeTypes {
     }
 }
 
+/// Entry point for the `make_types!` proc-macro implementation.
 pub(crate) fn make_types_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let make_types = parse_macro_input!(input as MakeTypes);
     make_types.into_token_stream().into()

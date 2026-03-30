@@ -1,3 +1,8 @@
+/// Generates a `String` new-type struct with `Deref`, `Serialize`/`Deserialize`, and optionally
+/// `Display`, `From<String>`, `From<&str>`, `FromStr`, and `Into<String>` impls.
+///
+/// Variants: `impl_new_string!(Name)` for all impls; `no_display`, `no_from`, or `no_into`
+/// to omit the corresponding conversion group.
 macro_rules! impl_new_string {
     (base $name:ident) => {
         #[doc = "AWS AppSync specific GraphQL scalar type implemented a [String] new-type"]

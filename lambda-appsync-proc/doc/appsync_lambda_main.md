@@ -65,7 +65,7 @@ essentially free:
 - Function name: Any valid Rust identifier that will be used to access the client
 - Return type: Must be a valid AWS SDK client like `aws_sdk_dynamodb::Client`
 
-```no_run
+```rust,no_run
 # mod sub {
 use lambda_appsync::appsync_lambda_main;
 
@@ -77,7 +77,7 @@ appsync_lambda_main!(
 # }
 # fn main() {}
 ```
-```no_run
+```rust,no_run
 # mod sub {
 # use lambda_appsync::appsync_lambda_main;
 // Multiple clients
@@ -91,7 +91,7 @@ appsync_lambda_main!(
 ```
 
 These client functions can then be called from anywhere in the Lambda crate:
-```no_run
+```rust,no_run
 # fn dynamodb() -> aws_sdk_dynamodb::Client {
 #   todo!()
 # }
@@ -112,7 +112,7 @@ async fn do_something() {
 # Examples
 
 ## Basic usage with authentication hook:
-```no_run
+```rust,no_run
 # mod sub {
 use lambda_appsync::{appsync_lambda_main, AppsyncEvent, AppsyncResponse, AppsyncIdentity};
 
@@ -143,7 +143,7 @@ appsync_lambda_main!(
 ```
 
 ## Generate only types for lib code generation:
-```no_run
+```rust,no_run
 # mod sub {
 use lambda_appsync::appsync_lambda_main;
 appsync_lambda_main!(
@@ -155,7 +155,7 @@ appsync_lambda_main!(
 ```
 
 ## Override field types, operation return type or argument types:
-```no_run
+```rust,no_run
 # mod sub {
 use lambda_appsync::appsync_lambda_main;
 appsync_lambda_main!(
@@ -178,7 +178,7 @@ appsync_lambda_main!(
 ```
 
 ## Override type, input, enum, fields or variants names:
-```no_run
+```rust,no_run
 # mod sub {
 use lambda_appsync::appsync_lambda_main;
 appsync_lambda_main!(
@@ -208,7 +208,7 @@ you are responsible to provide the appropriate casing or Clippy will complain.
 By default, `lambda_appsync` exposes and uses `log` and `env_logger`. You can override the
 initialization code if you wish:
 
-```no_run
+```rust,no_run
 # mod sub {
 // This is in fact equivalent to the default initialization code
 fn log_init_fct() {
@@ -235,7 +235,7 @@ lambda_appsync::appsync_lambda_main!(
 
 Alternatively, you can use the `tracing` feature so `lambda_appsync` exposes and uses `log`, `tracing` and `tracing-subscriber`
 
-```no_run
+```rust,no_run
 # mod sub {
 // This is in fact equivalent to the default initialization code
 fn tracing_init_fct() {
@@ -264,7 +264,7 @@ lambda_appsync::appsync_lambda_main!(
 ```
 
 ## Disable batch processing:
-```no_run
+```rust,no_run
 # mod sub {
 lambda_appsync::appsync_lambda_main!(
     "schema.graphql",

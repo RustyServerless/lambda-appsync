@@ -26,6 +26,7 @@ use syn::{
     parse_macro_input, LitStr, Result, Token,
 };
 
+/// Parsed input for the `make_appsync!` macro, combining the GraphQL schema with handler configuration.
 struct MakeAppsync {
     graphql_schema: GraphQLSchema,
     make_handlers: MakeHandlers,
@@ -85,7 +86,12 @@ impl Parse for MakeAppsync {
             make_handlers_parameters.try_parse_parameter(input)?;
         }
 
-        let graphql_schema = GraphQLSchema::new(graphql_schema_path, override_parameters, None)?;
+        let graphql_schema = GraphQLSchema::new(
+            graphql_schema_path,
+            override_parameters,
+            make_types_parameters,
+            make_operation_parameters,
+        )?;
 
         Ok(Self {
             graphql_schema,
@@ -104,6 +110,7 @@ impl ToTokens for MakeAppsync {
     }
 }
 
+/// Entry point for the `make_appsync!` proc-macro implementation.
 pub(crate) fn make_appsync_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let make_appsync = parse_macro_input!(input as MakeAppsync);
     make_appsync.into_token_stream().into()

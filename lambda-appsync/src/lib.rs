@@ -1,78 +1,258 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::missing_crate_level_docs)]
 #![cfg_attr(docsrs, deny(rustdoc::broken_intra_doc_links))]
-//! This crate provides procedural macros and types for implementing
-//! AWS AppSync Direct Lambda resolvers.
+//! A type-safe framework for AWS AppSync Direct Lambda resolvers.
 //!
-//! It helps convert GraphQL schemas into type-safe Rust code with full AWS Lambda runtime support.
-//! The main functionality is provided through the [appsync_lambda_main] and [appsync_operation] macros.
+//! This crate provides procedural macros and types for implementing
+//! AWS AppSync Direct Lambda resolvers. It converts GraphQL schemas into
+//! type-safe Rust code with full AWS Lambda runtime support.
+//!
+//! The recommended entry point is [`make_appsync!`], a convenience macro that generates all
+//! necessary types, the `Operation` dispatch enum, and a `Handlers` trait from a `.graphql`
+//! schema file. For finer control (e.g. shared-types libraries or multi-Lambda setups), the
+//! three composable macros [`make_types!`], [`make_operation!`], and [`make_handlers!`] can be
+//! used individually. Resolver functions are annotated with [`appsync_operation`].
+//!
+//! # Key Concepts
+//!
+//! ## Macros
+//!
+//! ### All-in-one
+//!
+//! - **[`make_appsync!`]** — reads a GraphQL schema file at compile time and generates:
+//!   - Rust types for all GraphQL objects/enums/inputs,
+//!   - an `Operation` enum covering every query/mutation/subscription field, and
+//!   - a `Handlers` trait with a `DefaultHandlers` struct for wiring up the Lambda runtime.
+//!
+//!   This is the recommended macro for single-crate projects.
+//!
+//! ### Composable
+//!
+//! - **[`make_types!`]** — generates Rust structs and enums from the schema's `type`, `input`,
+//!   and `enum` definitions.
+//! - **[`make_operation!`]** — generates the `Operation` enum, sub-enums (`QueryField`,
+//!   `MutationField`, `SubscriptionField`), argument extraction, and the `execute` dispatch
+//!   method. Requires the types from [`make_types!`] to be in scope.
+//! - **[`make_handlers!`]** — generates the `Handlers` trait and `DefaultHandlers` struct for
+//!   the Lambda runtime. Requires the `Operation` type from [`make_operation!`] to be in scope.
+//!
+//! ### Resolver attribute
+//!
+//! - **[`appsync_operation`]** — attribute macro applied to async resolver functions. It validates
+//!   that the function signature matches the corresponding GraphQL field and registers the function
+//!   as the handler for that operation.
+//!
+//! ### Deprecated
+//!
+//! - **`appsync_lambda_main!`** (`compat` feature) — the legacy monolithic macro. It combines
+//!   type generation, operation dispatch, Lambda runtime setup, and AWS SDK client initialization
+//!   into one call. Prefer [`make_appsync!`] or the composable macros for new code.
+//!
+//! ## Event and Response Types
+//!
+//! Every Lambda invocation receives an [`AppsyncEvent<O>`] where `O` is the generated `Operation`
+//! enum. The event carries:
+//!
+//! - [`AppsyncEvent::identity`] — the caller's [`AppsyncIdentity`] (Cognito, IAM, OIDC, Lambda
+//!   authorizer, or API key)
+//! - [`AppsyncEvent::info`] — an [`AppsyncEventInfo<O>`] with the specific operation, selection
+//!   set, and variables
+//! - [`AppsyncEvent::args`] — raw JSON arguments for the field; use [`arg_from_json`] to extract
+//!   individual typed arguments
+//! - [`AppsyncEvent::source`] — the parent object's resolved value for nested resolvers
+//!
+//! Resolver functions return `Result<T, `[`AppsyncError`]`>`. The framework serializes
+//! responses and wraps them in an [`AppsyncResponse`].
+//!
+//! ## Identity and Authorization
+//!
+//! [`AppsyncIdentity`] is an enum with one variant per AppSync authorization mode:
+//!
+//! | Variant | Auth mode | Detail struct |
+//! |---------|-----------|---------------|
+//! | [`AppsyncIdentity::Cognito`] | Cognito User Pools | [`AppsyncIdentityCognito`] |
+//! | [`AppsyncIdentity::Iam`] | AWS IAM / Cognito Identity Pools | [`AppsyncIdentityIam`] |
+//! | [`AppsyncIdentity::Oidc`] | OpenID Connect | [`AppsyncIdentityOidc`] |
+//! | [`AppsyncIdentity::Lambda`] | Lambda authorizer | [`AppsyncIdentityLambda`] |
+//! | [`AppsyncIdentity::ApiKey`] | API Key | *(no extra data)* |
+//!
+//! ## AWS AppSync Scalar Types
+//!
+//! The crate provides Rust types for all AppSync-specific GraphQL scalars:
+//!
+//! - [`ID`] — UUID-based GraphQL `ID` scalar
+//! - [`AWSEmail`], [`AWSPhone`], [`AWSUrl`] — validated string scalars
+//! - [`AWSDate`], [`AWSTime`], [`AWSDateTime`] — date/time scalars
+//! - [`AWSTimestamp`] — Unix epoch timestamp scalar
+//!
+//! ## Subscription Filters
+//!
+//! The [`subscription_filters`] module provides a type-safe builder for AppSync
+//! [enhanced subscription filters](https://docs.aws.amazon.com/appsync/latest/devguide/aws-appsync-real-time-enhanced-filtering.html).
+//! Filters are constructed from [`subscription_filters::FieldPath`] operator methods, combined
+//! into [`subscription_filters::Filter`] (AND logic, up to 5 conditions) and
+//! [`subscription_filters::FilterGroup`] (OR logic, up to 10 filters). AWS AppSync's size
+//! constraints are enforced at compile time.
+//!
+//! ## Error Handling
+//!
+//! [`AppsyncError`] carries an `error_type` and `error_message`. Multiple errors can be merged
+//! with the `|` operator, which concatenates both fields. Any AWS SDK error that implements
+//! `ProvideErrorMetadata` converts into an `AppsyncError` via `?`.
+//!
+//! ## Tracing Integration
+//!
+//! When the `tracing` feature is enabled, the generated `Handlers` trait automatically wraps
+//! each event dispatch in a `tracing::info_span!("AppsyncEvent", ...)` that records the
+//! operation being executed (and the batch index, when batch mode is active). This helps give you
+//! per-operation spans linked with the parent without writing any instrumentation boilerplate.
+//! The feature also re-exports `tracing` and `tracing-subscriber` for convenience.
 //!
 //! # Complete Example
 //!
-//! ```no_run
-//! use lambda_appsync::{appsync_lambda_main, appsync_operation, AppsyncError};
+//! Given a GraphQL schema (`schema.graphql`):
 //!
-//! // 1. First define your GraphQL schema (e.g. `schema.graphql`):
-//! //
-//! // type Query {
-//! //   players: [Player!]!
-//! //   gameStatus: GameStatus!
-//! // }
-//! //
-//! // type Player {
-//! //   id: ID!
-//! //   name: String!
-//! //   team: Team!
-//! // }
-//! //
-//! // enum Team {
-//! //   RUST
-//! //   PYTHON
-//! //   JS
-//! // }
-//! //
-//! // enum GameStatus {
-//! //   STARTED
-//! //   STOPPED
-//! // }
-//!
-//! // 2. Initialize the Lambda runtime with AWS SDK clients in main.rs:
-//!
-//! // Optional hook for custom request validation/auth
-//! async fn verify_request(
-//!     event: &lambda_appsync::AppsyncEvent<Operation>
-//! ) -> Option<lambda_appsync::AppsyncResponse> {
-//!     // Return Some(response) to short-circuit normal execution
-//!     None
+//! ```graphql
+//! type Query {
+//!   players: [Player!]!
+//!   gameStatus: GameStatus!
 //! }
-//! // Generate types and runtime setup from schema
-//! appsync_lambda_main!(
-//!     "schema.graphql",
-//!     // Initialize DynamoDB client if needed
-//!     dynamodb() -> aws_sdk_dynamodb::Client,
-//!     // Enable validation hook
-//!     hook = verify_request,
-//!     // Enable batch processing
-//!     batch = true
-//! );
 //!
-//! // 3. Implement resolver functions for GraphQL operations:
+//! type Player {
+//!   id: ID!
+//!   name: String!
+//!   team: Team!
+//! }
+//!
+//! enum Team {
+//!   RUST
+//!   PYTHON
+//!   JS
+//! }
+//!
+//! enum GameStatus {
+//!   STARTED
+//!   STOPPED
+//! }
+//! ```
+//!
+//! ## Using `make_appsync!` (recommended)
+//!
+//! ```rust,no_run
+//! # use lambda_appsync::{tokio, lambda_runtime};
+//! use lambda_appsync::{make_appsync, appsync_operation, AppsyncError};
+//!
+//! // Generate types, Operation enum, and Handlers trait from schema
+//! make_appsync!("schema.graphql");
+//!
+//! // Implement resolver functions for GraphQL operations:
 //!
 //! #[appsync_operation(query(players))]
 //! async fn get_players() -> Result<Vec<Player>, AppsyncError> {
-//!     let client = dynamodb();
 //!     todo!()
 //! }
 //!
 //! #[appsync_operation(query(gameStatus))]
 //! async fn get_game_status() -> Result<GameStatus, AppsyncError> {
-//!     let client = dynamodb();
 //!     todo!()
 //! }
-//! // The macro ensures the function signature matches the GraphQL schema
-//! // and wires everything up to handle AWS AppSync requests automatically
-//! # mod child {fn main() {}}
+//!
+//! // Wire up the Lambda runtime in main:
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), lambda_runtime::Error> {
+//!     lambda_runtime::run(
+//!         lambda_runtime::service_fn(DefaultHandlers::service_fn)
+//!     ).await
+//! }
 //! ```
+//!
+//! ## Custom handler with authentication hook
+//!
+//! Override the `Handlers` trait to add pre-processing logic (replaces the
+//! old `hook` parameter from `appsync_lambda_main!`):
+//!
+//! ```rust,no_run
+//! # use lambda_appsync::{tokio, lambda_runtime};
+//! use lambda_appsync::{make_appsync, appsync_operation, AppsyncError};
+//! use lambda_appsync::{AppsyncEvent, AppsyncResponse, AppsyncIdentity};
+//!
+//! make_appsync!("schema.graphql");
+//!
+//! struct MyHandlers;
+//! impl Handlers for MyHandlers {
+//!     async fn appsync_handler(event: AppsyncEvent<Operation>) -> AppsyncResponse {
+//!         // Custom authentication check
+//!         if let AppsyncIdentity::ApiKey = &event.identity {
+//!             return AppsyncResponse::unauthorized();
+//!         }
+//!         // Delegate to the default operation dispatch
+//!         event.info.operation.execute(event).await
+//!     }
+//! }
+//!
+//! #[appsync_operation(query(players))]
+//! async fn get_players() -> Result<Vec<Player>, AppsyncError> {
+//!     todo!()
+//! }
+//!
+//! #[appsync_operation(query(gameStatus))]
+//! async fn get_game_status() -> Result<GameStatus, AppsyncError> {
+//!     todo!()
+//! }
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), lambda_runtime::Error> {
+//!     lambda_runtime::run(
+//!         lambda_runtime::service_fn(MyHandlers::service_fn)
+//!     ).await
+//! }
+//! ```
+//!
+//! ## Using the composable macros
+//!
+//! For multi-crate setups (e.g. a shared types library with separate Lambda binaries),
+//! use the individual macros:
+//!
+//! ```rust,no_run
+//! # use lambda_appsync::{tokio, lambda_runtime};
+//! use lambda_appsync::{make_types, make_operation, make_handlers, appsync_operation, AppsyncError};
+//!
+//! // Step 1: Generate types (could live in a shared lib crate)
+//! make_types!("schema.graphql");
+//!
+//! // Step 2: Generate Operation enum and dispatch logic
+//! make_operation!("schema.graphql");
+//!
+//! // Step 3: Generate Handlers trait and DefaultHandlers
+//! make_handlers!();
+//!
+//! #[appsync_operation(query(players))]
+//! async fn get_players() -> Result<Vec<Player>, AppsyncError> {
+//!     todo!()
+//! }
+//!
+//! #[appsync_operation(query(gameStatus))]
+//! async fn get_game_status() -> Result<GameStatus, AppsyncError> {
+//!     todo!()
+//! }
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), lambda_runtime::Error> {
+//!     lambda_runtime::run(
+//!         lambda_runtime::service_fn(DefaultHandlers::service_fn)
+//!     ).await
+//! }
+//! ```
+//!
+//! # Feature Flags
+//!
+//! | Feature | Description |
+//! |---------|-------------|
+//! | **`compat`** | Enables the deprecated `appsync_lambda_main!` macro and re-exports `aws_config`, `lambda_runtime`, and `tokio`. Not required when using [`make_appsync!`] or the composable macros (you depend on `lambda_runtime` and `tokio` directly). |
+//! | **`log`** | Re-exports the [`log`](https://docs.rs/log) crate so resolver code can use `log::info!` etc. without a separate dependency. |
+//! | **`env_logger`** | Initializes `env_logger` for local development. Implies `log` and `compat`. |
+//! | **`tracing`** | Re-exports `tracing` and `tracing-subscriber` for structured, async-aware logging. |
 
 mod aws_scalars;
 mod id;
@@ -112,6 +292,7 @@ pub use serde;
 pub use serde_json;
 pub use tokio;
 
+/// Re-exports of `aws_config`, `lambda_runtime`, `tokio`, and `appsync_lambda_main` required by the `compat` feature.
 #[cfg(feature = "compat")]
 mod compat {
     pub use aws_config;
@@ -294,8 +475,8 @@ pub enum AppsyncIdentity {
 ///
 /// Contains detailed information about the GraphQL operation being executed,
 /// including the operation type, selected fields, and variables. The type parameter
-/// `O` represents the enum generated by [appsync_lambda_main] that defines all valid
-/// operations for this Lambda resolver.
+/// `O` represents the `Operation` enum generated by [make_appsync!] (or [make_operation!])
+/// that defines all valid operations for this Lambda resolver.
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct AppsyncEventInfo<O> {
@@ -315,8 +496,8 @@ pub struct AppsyncEventInfo<O> {
 /// Represents a complete AWS AppSync event sent to a Lambda resolver.
 ///
 /// Contains all context and data needed to resolve a GraphQL operation, including
-/// authentication details, operation info, and arguments. The generics `O`
-/// must be the Operation enum generated by the [appsync_lambda_main] macro.
+/// authentication details, operation info, and arguments. The generic `O`
+/// must be the `Operation` enum generated by [make_appsync!] (or [make_operation!]).
 ///
 /// # Limitations
 /// - Omits the `stash` field used for pipeline resolvers
@@ -570,7 +751,7 @@ pub fn arg_from_json<T: DeserializeOwned>(
 ///
 /// # Panics
 /// Panics if the value cannot be serialized to JSON. This should never happen
-/// for valid AppSync schema objects as generated by the `appsync_lambda_main` proc macro.
+/// for valid AppSync schema objects as generated by the `make_appsync!` (or `make_types!`) proc macro.
 ///
 /// # Examples
 /// ```

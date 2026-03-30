@@ -9,6 +9,7 @@ use super::super::{
     overrides::{NameOverride, NameOverrides, OverrideParameters, TypeOverride, TypeOverrides},
 };
 
+/// A parsed AWS SDK client declaration of the form `client_fn() -> aws_sdk_foo::Client`.
 struct AWSClient {
     fct_identifier: Ident,
     client_type: Type,
@@ -60,7 +61,7 @@ impl AWSClient {
     }
 }
 
-// I suppose this is acceptable for a proc-macro
+/// A single parsed parameter for the legacy `appsync_lambda_main!` macro.
 enum AppsyncLambdaMainParameter {
     Batch(bool),
     ExcludeLambdaHandler(bool),
@@ -109,6 +110,7 @@ impl OptionalParameter for AppsyncLambdaMainParameter {
     }
 }
 
+/// Accumulated parameters for the legacy `appsync_lambda_main!` macro after parsing.
 struct AppsyncLambdaMainParameters {
     batch: bool,
     appsync_types: bool,
@@ -212,6 +214,7 @@ impl OptionalParameters<AppsyncLambdaMainParameter> for AppsyncLambdaMainParamet
     }
 }
 
+/// Fully parsed input for the legacy `appsync_lambda_main!` macro, combining schema, AWS clients, and options.
 struct AppsyncLambdaMain {
     graphql_schema: GraphQLSchema,
     aws_clients: Vec<AWSClient>,
@@ -255,7 +258,8 @@ impl Parse for AppsyncLambdaMain {
                 type_overrides: std::mem::take(&mut parameters.tos),
                 name_overrides: std::mem::take(&mut parameters.nos),
             },
-            None,
+            Default::default(),
+            Default::default(),
         )?;
 
         Ok(Self {
@@ -484,6 +488,7 @@ impl ToTokens for AppsyncLambdaMain {
     }
 }
 
+/// Entry point for the legacy `appsync_lambda_main!` proc-macro implementation.
 pub(crate) fn appsync_lambda_main_impl(input: TokenStream) -> TokenStream {
     let alm = parse_macro_input!(input as AppsyncLambdaMain);
     alm.into_token_stream().into()

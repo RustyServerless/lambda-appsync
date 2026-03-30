@@ -6,8 +6,8 @@ use syn::{
     Ident, Type,
 };
 
-// TODO TMP crate vis, should be super
-pub(crate) struct TypeOverride {
+/// A parsed `type_override = Type.field[.arg]: CustomType` directive that replaces a generated Rust type.
+pub(super) struct TypeOverride {
     type_name: Ident,
     field_name: Ident,
     arg_name: Option<Ident>,
@@ -51,8 +51,8 @@ impl Parse for TypeOverride {
     }
 }
 
-// TODO TMP crate vis, should be super
-pub(crate) struct NameOverride {
+/// A parsed `name_override = Type[.field]: new_name` directive that renames a generated Rust type or field.
+pub(super) struct NameOverride {
     type_name: Ident,
     field_name: Option<Ident>,
     new_name: String,
@@ -88,42 +88,43 @@ impl Parse for NameOverride {
     }
 }
 
+///////////////////////////
 // Captures type_override = Type.field: CustomType and Type.field.param: CustomType options
-// using a HashMap hierarchy of TypeName -> FieldName -> (Optional field override, Map of arg overrides)
-// Top level mapping from GraphQL type names to their field overrides
+///////////////////////////
+/// Top-level map from GraphQL type names to their field type overrides.
 pub(crate) type TypeOverrides = HashMap<TypeName, FieldTypeOverrides>;
 
-// For each type, maps field names to their overrides
+/// Maps field names within a type to their type overrides.
 pub(crate) type FieldTypeOverrides = HashMap<FieldName, FieldTypeOverride>;
 
-// A field can have both a direct type override and argument type overrides
-// - First element: Optional field type override (Type.field: CustomType)
-// - Second element: Map of argument overrides (Type.field.arg: CustomType)
+/// Type overrides for a single field: an optional field-level override and a map of argument-level overrides.
 pub(crate) type FieldTypeOverride = (Option<TypeOverride>, ArgTypeOverrides);
 
-// Maps argument names to their type overrides for a field
+/// Maps argument names within an operation field to their type overrides.
 pub(crate) type ArgTypeOverrides = HashMap<ArgName, TypeOverride>;
 
+///////////////////////////
 // Captures name_override = Type: CustomName and Type.field: custom_name options
-// using a HashMap hierarchy of TypeName -> (Optional type override, Map of field overrides)
 // This works the same for name_override = Enum: CustomEnumName and Enum.VARIANT: CustomVariant
-// Top level mapping from GraphQL type names to their field overrides
+///////////////////////////
+/// Top-level map from GraphQL type names to their name overrides.
 pub(crate) type NameOverrides = HashMap<TypeName, TypeNameOverride>;
 
-// A type can have both a direct name override and field name overrides
-// - First element: Optional type name override (Type: CustomName)
-// - Second element: Map of field overrides (Type.field: custom_name)
+/// Name overrides for a single type: an optional type-level rename and a map of field-level renames.
 pub(crate) type TypeNameOverride = (Option<NameOverride>, FieldNameOverrides);
 
-// Maps field names to their name overrides for a field
+/// Maps field (or variant) names within a type to their name overrides.
 pub(crate) type FieldNameOverrides = HashMap<FieldName, NameOverride>;
 
-// [Type|Field|Arg]Name are just String
+/// A GraphQL type name string.
 pub(crate) type TypeName = String;
+/// A GraphQL field name string.
 pub(crate) type FieldName = String;
+/// A GraphQL argument name string.
 pub(crate) type ArgName = String;
 
 use super::optional_parameter::{OptionalParameter, OptionalParameters, ParameterError, Unknown};
+/// A single parsed override parameter, either a type override or a name override.
 pub(super) enum OverrideParameter {
     TypeOverride(TypeOverride),
     NameOverride(NameOverride),
@@ -141,6 +142,7 @@ impl OptionalParameter for OverrideParameter {
     }
 }
 
+/// Accumulated type and name override parameters parsed from a macro invocation.
 #[derive(Default)]
 pub(super) struct OverrideParameters {
     pub type_overrides: TypeOverrides,

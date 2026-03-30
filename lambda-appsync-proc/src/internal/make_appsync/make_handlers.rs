@@ -7,8 +7,11 @@ use syn::{
 
 use super::optional_parameter::{OptionalParameter, OptionalParameters, ParameterError, Unknown};
 
+/// A single parsed parameter for the `make_handlers!` macro.
 pub(super) enum MakeHandlersParameter {
+    /// Whether to generate a batch handler (default: `true`).
     Batch(bool),
+    /// A custom operation type to use instead of the default `Operation`.
     OperationType(Type),
 }
 impl OptionalParameter for MakeHandlersParameter {
@@ -25,6 +28,7 @@ impl OptionalParameter for MakeHandlersParameter {
     }
 }
 
+/// Accumulated parameters for the `make_handlers!` macro after parsing.
 pub(super) struct MakeHandlersParameters {
     batch: bool,
     operation_type: Option<Type>,
@@ -46,6 +50,7 @@ impl OptionalParameters<MakeHandlersParameter> for MakeHandlersParameters {
     }
 }
 
+/// Generates the `Handlers` trait and `DefaultHandlers` implementation for dispatching AppSync events.
 pub(super) struct MakeHandlers {
     batch: bool,
     operation_type: TokenStream2,
@@ -70,13 +75,11 @@ impl From<MakeHandlersParameters> for MakeHandlers {
 impl Parse for MakeHandlers {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut parameters = MakeHandlersParameters::default();
-
-        while input.peek(Token![,]) {
-            _ = input.parse::<Token![,]>()?;
-            if input.is_empty() {
-                break;
+        while !input.is_empty() {
+            parameters.try_parse_parameter(input)?;
+            if input.peek(Token![,]) {
+                _ = input.parse::<Token![,]>()?;
             }
-            parameters.try_parse_parameter(input)?
         }
 
         Ok(parameters.into())
@@ -90,15 +93,14 @@ impl ToTokens for MakeHandlers {
         if self.batch {
             let spawn_code = if cfg!(feature = "tracing") {
                 quote! {
-                    use ::tracing::Instrument;
                     let handles = events
                         .into_iter()
                         .enumerate()
                         .map(|(index, event)| {
                             let operation = event.info.operation;
                             ::lambda_appsync::tokio::spawn(
-                                Self::appsync_handler(event).instrument(
-                                    ::tracing::info_span!(
+                                ::lambda_appsync::tracing::Instrument::instrument(Self::appsync_handler(event),
+                                    ::lambda_appsync::tracing::info_span!(
                                         "AppsyncEvent",
                                         "otel.name"=format!("AppsyncEvent #{index}"),
                                         batch_index=index,
@@ -158,8 +160,8 @@ impl ToTokens for MakeHandlers {
             quote! {
                 async fn appsync_handler(event: ::lambda_appsync::AppsyncEvent<#operation>) -> ::lambda_appsync::AppsyncResponse {
                     let operation = event.info.operation;
-                    event.info.operation.execute(event).instrument(
-                        ::tracing::info_span!(
+                    ::lambda_appsync::tracing::Instrument::instrument(event.info.operation.execute(event),
+                        ::lambda_appsync::tracing::info_span!(
                             "AppsyncEvent",
                             ?operation
                         )
@@ -198,6 +200,7 @@ impl ToTokens for MakeHandlers {
     }
 }
 
+/// Entry point for the `make_handlers!` proc-macro implementation.
 pub(crate) fn make_handlers_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let make_handlers = parse_macro_input!(input as MakeHandlers);
     make_handlers.into_token_stream().into()

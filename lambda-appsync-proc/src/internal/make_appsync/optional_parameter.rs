@@ -3,9 +3,13 @@ use syn::{
     Ident, Token,
 };
 
+/// Error returned when attempting to parse an optional macro parameter.
 pub(crate) enum ParameterError {
+    /// The token stream does not match any known parameter name.
     InexistantParameter(syn::Error),
+    /// The token stream does not look like a parameter at all (e.g. missing `=`).
     NotParameter(syn::Error),
+    /// The parameter name matched but its value failed to parse.
     ArgumentError(syn::Error),
 }
 impl From<syn::Error> for ParameterError {
@@ -23,6 +27,7 @@ impl From<ParameterError> for syn::Error {
     }
 }
 
+/// Parses a single named optional parameter of the form `name = value` from a token stream.
 pub(super) trait OptionalParameter: Sized {
     fn try_parse_parameter(input: ParseStream) -> Result<Self, ParameterError>;
     fn parse_ident(input: ParseStream) -> Result<Ident, ParameterError> {
@@ -35,6 +40,7 @@ pub(super) trait OptionalParameter: Sized {
         Ok(ident)
     }
 }
+/// Extension for [`struct@Ident`] to produce an [`ParameterError::InexistantParameter`] error.
 pub(super) trait Unknown {
     fn unknown<T>(&self) -> Result<T, ParameterError>;
 }
@@ -48,6 +54,7 @@ impl Unknown for Ident {
     }
 }
 
+/// Accumulates multiple [`OptionalParameter`]s into a parameters struct, using speculative parsing.
 pub(super) trait OptionalParameters<P: OptionalParameter>: Default {
     fn try_parse_parameter(&mut self, input: ParseStream) -> Result<(), ParameterError> {
         let forked_input = input.fork();

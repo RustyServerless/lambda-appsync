@@ -12,8 +12,11 @@ use super::{
     GraphQLSchema, OverrideParameters,
 };
 
+/// A single parsed parameter for the `make_operation!` macro.
 pub(super) enum MakeOperationParameter {
+    /// A module path prefix applied to all custom types referenced in operations.
     TypeModule(Path),
+    /// Whether to log errors via `log::error!` (requires `log` feature, default: `true`).
     #[cfg(feature = "log")]
     ErrorLogging(bool),
 }
@@ -31,6 +34,7 @@ impl OptionalParameter for MakeOperationParameter {
     }
 }
 
+/// Accumulated parameters for the `make_operation!` macro after parsing.
 pub(super) struct MakeOperationParameters {
     pub(super) type_module: Option<Path>,
     #[cfg(feature = "log")]
@@ -56,6 +60,7 @@ impl OptionalParameters<MakeOperationParameter> for MakeOperationParameters {
     }
 }
 
+/// Parsed input for the `make_operation!` macro, generating only the operation dispatch code.
 struct MakeOperation {
     graphql_schema: GraphQLSchema,
 }
@@ -88,8 +93,12 @@ impl Parse for MakeOperation {
             parameters.try_parse_parameter(input)?;
         }
 
-        let graphql_schema =
-            GraphQLSchema::new(graphql_schema_path, override_parameters, Some(parameters))?;
+        let graphql_schema = GraphQLSchema::new(
+            graphql_schema_path,
+            override_parameters,
+            Default::default(),
+            parameters,
+        )?;
 
         Ok(Self { graphql_schema })
     }
@@ -101,6 +110,7 @@ impl ToTokens for MakeOperation {
     }
 }
 
+/// Entry point for the `make_operation!` proc-macro implementation.
 pub(crate) fn make_operation_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let make_operation = parse_macro_input!(input as MakeOperation);
     make_operation.into_token_stream().into()
