@@ -7,17 +7,22 @@ use super::common::{Name, OperationKind};
 
 /// Optional flags accepted by the `appsync_operation` macro attribute.
 enum ArgsOption {
-    /// Preserve the original function name in addition to generating the operation method.
+    /// Preserve the original function name in addition to generating the operation method
+    #[cfg(feature = "compat")]
     KeepOriginalFunctionName,
     /// Pass the full `AppsyncEvent` as an extra argument to the handler.
     WithAppsyncEvent,
+    /// Remove the function and inline its body inside the implemented method on Operation
+    InlineAndRemove,
 }
 impl Parse for ArgsOption {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let ident = input.parse::<Ident>()?;
         match ident.to_string().as_str() {
+            #[cfg(feature = "compat")]
             "keep_original_function_name" => Ok(Self::KeepOriginalFunctionName),
             "with_appsync_event" => Ok(Self::WithAppsyncEvent),
+            "inline_and_remove" => Ok(Self::InlineAndRemove),
             _ => Err(syn::Error::new(
                 ident.span(),
                 format!("Unknown option `{ident}`",),
@@ -33,6 +38,7 @@ struct Args {
     keep_original_function_name: bool,
     with_appsync_event: bool,
 }
+
 impl Parse for Args {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let op_kind = input.parse::<Ident>()?;
@@ -58,7 +64,7 @@ impl Parse for Args {
         let mut args = Self {
             op_kind,
             op_name,
-            keep_original_function_name: false,
+            keep_original_function_name: !cfg!(feature = "compat"),
             with_appsync_event: false,
         };
 
@@ -70,8 +76,10 @@ impl Parse for Args {
             // We got an option
             let option = input.parse::<ArgsOption>()?;
             match option {
+                #[cfg(feature = "compat")]
                 ArgsOption::KeepOriginalFunctionName => args.keep_original_function_name = true,
                 ArgsOption::WithAppsyncEvent => args.with_appsync_event = true,
+                ArgsOption::InlineAndRemove => args.keep_original_function_name = false,
             }
         }
         Ok(args)

@@ -44,6 +44,7 @@ impl Default for MakeOperationParameters {
     fn default() -> Self {
         Self {
             type_module: None,
+            #[cfg(feature = "log")]
             error_logging: true,
         }
     }

@@ -78,33 +78,57 @@ Note that the `args` field of the [AppsyncEvent](struct.AppsyncEvent.html) will 
 [Null](https://docs.rs/serde_json/latest/serde_json/enum.Value.html#variant.Null) at this stage because its initial content is taken to extract
 the argument values for the operation.
 
-## Preserve original function name
+## Original function preservation
 
-By default the [macro@appsync_operation] macro will discard your function's name but
-you can also keep it available by adding the `keep_original_function_name` flag:
+By default the [macro@appsync_operation] macro preserves your original function in addition to
+generating the `impl Operation` method. This means you can call the function directly elsewhere
+in your code:
+
 ```rust,no_run
 # lambda_appsync::make_appsync!("schema.graphql");
-# mod sub {
-use lambda_appsync::{appsync_operation, AppsyncError};
-
-// Your types are declared at the crate level by the make_appsync! macro
-use crate::Player;
-
 # async fn dynamodb_get_players() -> Result<Vec<Player>, AppsyncError> {
 #    todo!()
 # }
-// Keep the original function name available separately
-#[appsync_operation(query(players), keep_original_function_name)]
+# // Needed because compat is enabled
+# async fn fetch_players() {}
+# use lambda_appsync::{appsync_operation, AppsyncError};
+
+#[appsync_operation(query(players))]
 async fn fetch_players() -> Result<Vec<Player>, AppsyncError> {
     Ok(dynamodb_get_players().await?)
 }
 async fn other_stuff() {
-    // Can still call fetch_players() directly
+    // fetch_players() is still available as a regular function
     fetch_players().await;
-}
-# }
+} 
 # fn main() {}
 ```
+
+If you want the original function to be removed (its body is inlined into the generated
+`impl Operation` method), use the `inline_and_remove` flag:
+
+```rust,compile_fail
+# lambda_appsync::make_appsync!("schema.graphql");
+# use lambda_appsync::{appsync_operation, AppsyncError};
+
+#[appsync_operation(query(players), inline_and_remove)]
+async fn get_players() -> Result<Vec<Player>, AppsyncError> {
+    Ok(vec![])
+}
+
+async fn other_stuff() {
+    // get_players() is NOT available anymore.
+    get_players().await;
+} 
+
+# fn main() {}
+```
+
+### `keep_original_function_name` (compat only)
+
+When the `compat` feature is enabled, the old default behavior is restored: the original function
+is inlined and removed by default. In that mode, the `keep_original_function_name` flag is available to
+explicitly preserve the function.
 
 ## Using enhanced subscription filters
 

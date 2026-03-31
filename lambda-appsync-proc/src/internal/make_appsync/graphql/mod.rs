@@ -70,6 +70,7 @@ pub(super) struct GraphQLSchema {
     subscriptions: Operations,
     structures: Vec<Structure>,
     enums: Vec<Enum>,
+    #[cfg(feature = "log")]
     make_operation_parameters: MakeOperationParameters,
 }
 impl GraphQLSchema {
@@ -270,6 +271,7 @@ impl GraphQLSchema {
                 subscriptions: subscriptions.unwrap_or_default(),
                 structures,
                 enums,
+                #[cfg(feature = "log")]
                 make_operation_parameters,
             })
         } else {

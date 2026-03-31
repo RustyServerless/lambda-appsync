@@ -324,18 +324,38 @@ async fn create_player(
 }
 ```
 
-### Preserving Original Function Names
+### Original Function Preservation
 
-Keep the original function name available while using it as an operation handler:
+By default, `#[appsync_operation]` preserves the original function alongside the generated `impl Operation` method. You can call it directly elsewhere in your code:
 
 ```rust
-#[appsync_operation(query(players), keep_original_function_name)]
+#[appsync_operation(query(players))]
 async fn fetch_players() -> Result<Vec<Player>, AppsyncError> {
     todo!()
 }
 
-// Can still call fetch_players() directly elsewhere
+// fetch_players() is still available as a regular function
 ```
+
+If you want the function to be removed (its body is inlined into the generated method), use `inline_and_remove`. This can be handy when generating handlers with `macro_rules!`, where you don't want the function name to collide with itself:
+
+```rust
+macro_rules! game_status_mut {
+    ($mut_name:ident, $status:path) => {
+        #[appsync_operation(mutation($mut_name), inline_and_remove)]
+        pub async fn _discarded() -> Result<GameStatus, AppsyncError> {
+            dynamodb_set_game_status($status).await?;
+            Ok($status)
+        }
+    };
+}
+
+game_status_mut!(startGame, GameStatus::Started);
+game_status_mut!(stopGame, GameStatus::Stopped);
+game_status_mut!(resetGame, GameStatus::Reset);
+```
+
+> **Note:** When the `compat` feature is enabled, the old default behavior is restored (inline and remove), and the `keep_original_function_name` parameter is available to opt back into preservation.
 
 ### AWS SDK Error Support
 
