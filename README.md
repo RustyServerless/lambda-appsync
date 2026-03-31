@@ -647,5 +647,6 @@ Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information
 
 ## Authors
 
-- Jérémie RODON ([@JeremieRodon](https://github.com/JeremieRodon))
-- [RustyServerless](https://github.com/RustyServerless) organization
+- Jérémie RODON ([@JeremieRodon](https://github.com/JeremieRodon)) [![LinkedIn](https://img.shields.io/badge/linkedin-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/JeremieRodon) — [RustyServerless](https://github.com/RustyServerless) [rustysl.com](https://rustysl.com/index.html?from=github-lambda-appsync)
+
+If you find this crate useful, please star the repository and share your feedback!
