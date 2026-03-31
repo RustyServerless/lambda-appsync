@@ -1,0 +1,5 @@
+error: No argument `invalidArg` in operation `Query::player`
+ --> tests/fail/make_appsync_invalid_operation_arg_type_override.rs:3:34
+  |
+3 |     type_override = Query.player.invalidArg: String,
+  |                                  ^^^^^^^^^^

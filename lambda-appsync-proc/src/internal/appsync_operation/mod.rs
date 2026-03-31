@@ -3,18 +3,26 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{braced, parenthesized, parse::Parse, parse_macro_input, Ident, Token, Type, Visibility};
 
-use crate::common::{Name, OperationKind};
+use super::common::{Name, OperationKind};
 
+/// Optional flags accepted by the `appsync_operation` macro attribute.
 enum ArgsOption {
+    /// Preserve the original function name in addition to generating the operation method
+    #[cfg(feature = "compat")]
     KeepOriginalFunctionName,
+    /// Pass the full `AppsyncEvent` as an extra argument to the handler.
     WithAppsyncEvent,
+    /// Remove the function and inline its body inside the implemented method on Operation
+    InlineAndRemove,
 }
 impl Parse for ArgsOption {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let ident = input.parse::<Ident>()?;
         match ident.to_string().as_str() {
+            #[cfg(feature = "compat")]
             "keep_original_function_name" => Ok(Self::KeepOriginalFunctionName),
             "with_appsync_event" => Ok(Self::WithAppsyncEvent),
+            "inline_and_remove" => Ok(Self::InlineAndRemove),
             _ => Err(syn::Error::new(
                 ident.span(),
                 format!("Unknown option `{ident}`",),
@@ -23,12 +31,14 @@ impl Parse for ArgsOption {
     }
 }
 
+/// Parsed macro attribute arguments for `appsync_operation`.
 struct Args {
     op_kind: OperationKind,
     op_name: Name,
     keep_original_function_name: bool,
     with_appsync_event: bool,
 }
+
 impl Parse for Args {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let op_kind = input.parse::<Ident>()?;
@@ -54,7 +64,7 @@ impl Parse for Args {
         let mut args = Self {
             op_kind,
             op_name,
-            keep_original_function_name: false,
+            keep_original_function_name: !cfg!(feature = "compat"),
             with_appsync_event: false,
         };
 
@@ -66,14 +76,17 @@ impl Parse for Args {
             // We got an option
             let option = input.parse::<ArgsOption>()?;
             match option {
+                #[cfg(feature = "compat")]
                 ArgsOption::KeepOriginalFunctionName => args.keep_original_function_name = true,
                 ArgsOption::WithAppsyncEvent => args.with_appsync_event = true,
+                ArgsOption::InlineAndRemove => args.keep_original_function_name = false,
             }
         }
         Ok(args)
     }
 }
 
+/// A single parsed function argument, including its optional `mut` binding.
 struct FctArg {
     is_mut: bool,
     name: Ident,
@@ -105,6 +118,7 @@ impl ToTokens for FctArg {
         });
     }
 }
+/// A parsed async function that the `appsync_operation` macro is applied to.
 struct Fct {
     vis: Option<Visibility>,
     fct_name: Ident,
@@ -113,6 +127,7 @@ struct Fct {
     body: TokenStream2,
 }
 impl Fct {
+    /// Generates a non-async stub of the function used for compile-time signature checking.
     fn dummy_function(&self) -> TokenStream2 {
         let fct_name = &self.fct_name;
         let args = self.args.iter();
@@ -193,11 +208,13 @@ impl ToTokens for Fct {
     }
 }
 
+/// The fully parsed input to the `appsync_operation` macro, combining its attribute args and the annotated function.
 struct AppsyncOperation {
     args: Args,
     fct: Fct,
 }
 impl AppsyncOperation {
+    /// Returns the token stream for the path to the generated operation submodule in `__operations`.
     fn op_module_path(&self) -> TokenStream2 {
         let op_module_name = self.args.op_name.to_var_ident();
         let span = op_module_name.span();
@@ -211,6 +228,7 @@ impl AppsyncOperation {
             crate::__operations::#op_type_module::#op_module_name::#op_submodule_name
         }
     }
+    /// Generates a compile-time assertion that verifies the user function matches the expected operation signature.
     fn check_signature_to_tokens(&self) -> TokenStream2 {
         let op_module_path = self.op_module_path();
 
@@ -225,6 +243,7 @@ impl AppsyncOperation {
         }
     }
 
+    /// Generates the `impl Operation` method that extracts arguments and dispatches to the user function.
     fn impl_operation_to_tokens(&self) -> TokenStream2 {
         let vis = if let Some(ref vis) = self.fct.vis {
             vis.into_token_stream()
@@ -281,6 +300,7 @@ impl ToTokens for AppsyncOperation {
     }
 }
 
+/// Entry point for the `appsync_operation` proc-macro implementation.
 pub(crate) fn appsync_operation_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as Args);
     let fct = parse_macro_input!(input as Fct);

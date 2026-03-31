@@ -1,0 +1,5 @@
+error: No field `inexistant` in `Player`
+ --> tests/fail/make_appsync_invalid_field_type_override.rs:3:28
+  |
+3 |     type_override = Player.inexistant: String,
+  |                            ^^^^^^^^^^

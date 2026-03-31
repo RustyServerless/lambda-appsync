@@ -1,0 +1,5 @@
+error: cannot find derive macro `NotADeriveMacro` in this scope
+ --> tests/fail/make_types_invalid_derive.rs:3:22
+  |
+3 |     derive = Player: NotADeriveMacro,
+  |                      ^^^^^^^^^^^^^^^

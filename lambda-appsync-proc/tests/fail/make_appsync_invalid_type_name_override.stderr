@@ -1,0 +1,5 @@
+error: No type, enum or input named `Inexistant`
+ --> tests/fail/make_appsync_invalid_type_name_override.rs:3:21
+  |
+3 |     name_override = Inexistant: NewName,
+  |                     ^^^^^^^^^^

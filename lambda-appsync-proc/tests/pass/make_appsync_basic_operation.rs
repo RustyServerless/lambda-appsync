@@ -1,8 +1,6 @@
-use lambda_appsync::{
-    appsync_lambda_main, appsync_operation, subscription_filters::FilterGroup, AppsyncError, ID,
-};
+use lambda_appsync::{appsync_operation, subscription_filters::FilterGroup, AppsyncError, ID};
 
-appsync_lambda_main!("../../../../schema.graphql", exclude_lambda_handler = true);
+lambda_appsync::make_appsync!("../../../../schema.graphql");
 fn main() {}
 
 #[appsync_operation(query(players))]

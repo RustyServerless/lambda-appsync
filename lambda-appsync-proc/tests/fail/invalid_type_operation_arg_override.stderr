@@ -3,14 +3,3 @@ error[E0412]: cannot find type `BadId` in this scope
   |
 7 |     type_override = Query.player.id: BadId,
   |                                      ^^^^^ not found in this scope
-
-error[E0412]: cannot find type `BadId` in this scope
- --> tests/fail/invalid_type_operation_arg_override.rs:7:38
-  |
-7 |     type_override = Query.player.id: BadId,
-  |                                      ^^^^^ not found in this scope
-  |
-help: you might be missing a type parameter
-  |
-4 |     "../../../../schema.graphql"<BadId>,
-  |                                 +++++++

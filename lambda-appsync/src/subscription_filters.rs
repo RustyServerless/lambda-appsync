@@ -70,7 +70,19 @@ use crate::{
     AWSDate, AWSDateTime, AWSEmail, AWSPhone, AWSTime, AWSTimestamp, AWSUrl, AppsyncError, ID,
 };
 
-/// Private marker trait for types that can be used in filter values
+/// Marker trait for types that can be used as values in subscription filter operators.
+///
+/// This trait is implemented for numeric types ([`u8`], [`i8`], [`u16`], [`i16`], [`u32`],
+/// [`i32`], [`u64`], [`i64`], [`u128`], [`i128`], [`f32`], [`f64`]), [`String`], [`str`],
+/// and all AppSync scalar types ([`ID`], [`AWSEmail`], [`AWSUrl`], [`AWSDate`], [`AWSTime`],
+/// [`AWSPhone`], [`AWSDateTime`], [`AWSTimestamp`]).
+///
+/// It is used as a bound on the comparison operators of [`FieldPath`] that accept numeric
+/// or string values (e.g., [`FieldPath::le`], [`FieldPath::gt`], [`FieldPath::contains`]).
+/// Boolean values are intentionally excluded from this trait — use [`IFSBValueMarker`] for
+/// operators that also accept booleans (e.g., [`FieldPath::eq`], [`FieldPath::ne`]).
+///
+/// This trait is sealed: it cannot be implemented outside of this crate.
 pub trait IFSValueMarker: private::Sealed + Serialize {
     /// Convert the value to a serde_json::Value
     fn to_value(&self) -> serde_json::Value {
@@ -78,7 +90,17 @@ pub trait IFSValueMarker: private::Sealed + Serialize {
     }
 }
 
-/// Private marker trait for types that can be used in equality operations
+/// Marker trait for types that can be used as values in equality and inequality filter operators.
+///
+/// This trait extends the set of valid filter value types beyond [`IFSValueMarker`] by also
+/// including [`bool`]. It is implemented for all numeric types, [`String`], [`str`], [`bool`],
+/// and all AppSync scalar types ([`ID`], [`AWSEmail`], [`AWSUrl`], [`AWSDate`], [`AWSTime`],
+/// [`AWSPhone`], [`AWSDateTime`], [`AWSTimestamp`]).
+///
+/// It is used as a bound on [`FieldPath::eq`] and [`FieldPath::ne`], which are the only
+/// operators that accept boolean values in addition to numbers and strings.
+///
+/// This trait is sealed: it cannot be implemented outside of this crate.
 pub trait IFSBValueMarker: private::Sealed + Serialize {
     /// Convert the value to a serde_json::Value
     fn to_value(&self) -> serde_json::Value {
@@ -86,10 +108,12 @@ pub trait IFSBValueMarker: private::Sealed + Serialize {
     }
 }
 
+/// Sealed trait module to prevent external implementations of marker traits.
 mod private {
     pub trait Sealed {}
 }
 
+/// Implements one or more marker traits for a list of types in a single invocation.
 macro_rules! impl_markers {
     (nested $tr:ty, ($($t:ty),+)) => {
         $(impl $tr for $t {})+
@@ -179,6 +203,7 @@ type InVec<T> = FixedVec<T, 5>;
 /// A vector limited to 20 elements for ContainsAny operator
 type ContainsAnyVec<T> = FixedVec<T, 20>;
 
+/// Implements `From<[T; N]>` for [`FixedVec<T, M>`] for each supported array length N ≤ M.
 macro_rules! impl_from_array {
     (none 5) => {
         [None, None, None, None, None]
@@ -556,6 +581,7 @@ impl FieldPath {
     }
 }
 
+/// AppSync subscription filter comparison operator, serialized in camelCase.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 enum FilterOp {
@@ -596,6 +622,7 @@ pub struct FieldFilter {
     value: serde_json::Value,
 }
 impl FieldFilter {
+    /// Constructs a [`FieldFilter`] from a path, pre-serialized value, and operator.
     fn new(path: FieldPath, value: serde_json::Value, operator: FilterOp) -> Self {
         Self {
             path,

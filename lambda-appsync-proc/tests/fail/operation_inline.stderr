@@ -1,0 +1,53 @@
+error[E0425]: cannot find function `create_player` in this scope
+  --> tests/fail/operation_inline.rs:72:13
+   |
+72 |     let _ = create_player("test".to_string()).await;
+   |             ^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `get_players` in this scope
+  --> tests/fail/operation_inline.rs:73:13
+   |
+73 |     let _ = get_players().await;
+   |             ^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `get_game_status` in this scope
+  --> tests/fail/operation_inline.rs:74:13
+   |
+74 |     let _ = get_game_status().await;
+   |             ^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `get_player` in this scope
+  --> tests/fail/operation_inline.rs:75:13
+   |
+75 |     let _ = get_player(ID::new()).await;
+   |             ^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `delete_player` in this scope
+  --> tests/fail/operation_inline.rs:76:13
+   |
+76 |     let _ = delete_player(ID::new()).await;
+   |             ^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `set_game_status` in this scope
+  --> tests/fail/operation_inline.rs:77:13
+   |
+77 |     let _ = set_game_status().await;
+   |             ^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `on_create_player` in this scope
+  --> tests/fail/operation_inline.rs:78:13
+   |
+78 |     let _ = on_create_player("test".to_string()).await;
+   |             ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `on_delete_player` in this scope
+  --> tests/fail/operation_inline.rs:79:13
+   |
+79 |     let _ = on_delete_player(ID::new()).await;
+   |             ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `on_game_status_change` in this scope
+  --> tests/fail/operation_inline.rs:80:13
+   |
+80 |     let _ = on_game_status_change().await;
+   |             ^^^^^^^^^^^^^^^^^^^^^ not found in this scope
