@@ -14,4 +14,4 @@ help: consider importing one of these modules
   |
 1 + use crate::__operations::queries::game_status::without_event;
   |
-    and 5 other candidates
+  = and 5 other candidates

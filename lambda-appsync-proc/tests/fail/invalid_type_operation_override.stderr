@@ -1,5 +1,17 @@
-error[E0412]: cannot find type `InvalidStatus` in this scope
+error[E0425]: cannot find type `InvalidStatus` in this scope
  --> tests/fail/invalid_type_operation_override.rs:7:39
   |
 7 |     type_override = Query.gameStatus: InvalidStatus,
   |                                       ^^^^^^^^^^^^^ not found in this scope
+
+error[E0282]: type annotations needed
+ --> tests/fail/invalid_type_operation_override.rs:3:1
+  |
+3 | / appsync_lambda_main!(
+4 | |     "../../../../schema.graphql",
+5 | |     exclude_lambda_handler = true,
+... |
+8 | | );
+  | |_^ cannot infer type
+  |
+  = note: this error originates in the macro `appsync_lambda_main` (in Nightly builds, run with -Z macro-backtrace for more info)

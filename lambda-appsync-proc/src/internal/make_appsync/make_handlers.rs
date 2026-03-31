@@ -12,7 +12,7 @@ pub(super) enum MakeHandlersParameter {
     /// Whether to generate a batch handler (default: `true`).
     Batch(bool),
     /// A custom operation type to use instead of the default `Operation`.
-    OperationType(Type),
+    OperationType(Box<Type>),
 }
 impl OptionalParameter for MakeHandlersParameter {
     fn try_parse_parameter(
@@ -45,7 +45,7 @@ impl OptionalParameters<MakeHandlersParameter> for MakeHandlersParameters {
     fn set_param(&mut self, p: MakeHandlersParameter) {
         match p {
             MakeHandlersParameter::Batch(batch) => self.batch = batch,
-            MakeHandlersParameter::OperationType(t) => self.operation_type = Some(t),
+            MakeHandlersParameter::OperationType(t) => self.operation_type = Some(*t),
         }
     }
 }

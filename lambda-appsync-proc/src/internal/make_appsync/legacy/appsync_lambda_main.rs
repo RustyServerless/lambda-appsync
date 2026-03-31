@@ -74,7 +74,7 @@ enum AppsyncLambdaMainParameter {
     LogInit(Ident),
     #[cfg(feature = "log")]
     EventLogging(bool),
-    TypeOverride(TypeOverride),
+    TypeOverride(Box<TypeOverride>),
     NameOverride(NameOverride),
 }
 impl OptionalParameter for AppsyncLambdaMainParameter {
@@ -184,11 +184,11 @@ impl OptionalParameters<AppsyncLambdaMainParameter> for AppsyncLambdaMainParamet
                 if let Some(arg_name) = to.arg_name() {
                     // There is a `.param`
                     // This is a parameter override
-                    to_field_entry.1.insert(arg_name.to_string(), to);
+                    to_field_entry.1.insert(arg_name.to_string(), *to);
                 } else {
                     // no `.param`
                     // This is just a field override
-                    to_field_entry.0.replace(to);
+                    to_field_entry.0.replace(*to);
                 }
             }
             AppsyncLambdaMainParameter::NameOverride(no) => {

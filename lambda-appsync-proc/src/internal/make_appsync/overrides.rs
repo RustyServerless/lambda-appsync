@@ -126,7 +126,7 @@ pub(crate) type ArgName = String;
 use super::optional_parameter::{OptionalParameter, OptionalParameters, ParameterError, Unknown};
 /// A single parsed override parameter, either a type override or a name override.
 pub(super) enum OverrideParameter {
-    TypeOverride(TypeOverride),
+    TypeOverride(Box<TypeOverride>),
     NameOverride(NameOverride),
 }
 
@@ -162,11 +162,11 @@ impl OptionalParameters<OverrideParameter> for OverrideParameters {
                 if let Some(arg_name) = to.arg_name() {
                     // There is a `.param`
                     // This is a parameter override
-                    to_field_entry.1.insert(arg_name.to_string(), to);
+                    to_field_entry.1.insert(arg_name.to_string(), *to);
                 } else {
                     // no `.param`
                     // This is just a field override
-                    to_field_entry.0.replace(to);
+                    to_field_entry.0.replace(*to);
                 }
             }
             OverrideParameter::NameOverride(no) => {

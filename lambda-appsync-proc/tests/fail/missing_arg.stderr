@@ -2,10 +2,7 @@ error[E0308]: mismatched types
  --> tests/fail/missing_arg.rs:6:1
   |
 6 | #[appsync_operation(mutation(createPlayer))]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  | |
-  | expected `(String,)`, found `()`
-  | this expression has type `(std::string::String,)`
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `(String,)`, found `()`
   |
   = note:  expected tuple `(std::string::String,)`
           found unit type `()`

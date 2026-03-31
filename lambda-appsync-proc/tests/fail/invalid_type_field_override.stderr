@@ -1,4 +1,4 @@
-error[E0412]: cannot find type `NonExistentType` in this scope
+error[E0425]: cannot find type `NonExistentType` in this scope
  --> tests/fail/invalid_type_field_override.rs:7:32
   |
 7 |     type_override = Player.id: NonExistentType,

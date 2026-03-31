@@ -1,4 +1,4 @@
-error[E0271]: expected `wrong_return_type` to be a fn item that returns `Result<Vec<Player>, AppsyncError>`, but it returns `Result<String, AppsyncError>`
+error[E0271]: expected `wrong_return_type` to return `Result<Vec<Player>, AppsyncError>`, but it returns `Result<String, AppsyncError>`
  --> tests/fail/invalid_return_type.rs:7:10
   |
 6 | #[appsync_operation(query(players))]
