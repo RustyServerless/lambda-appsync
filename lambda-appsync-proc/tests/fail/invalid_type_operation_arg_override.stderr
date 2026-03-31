@@ -1,4 +1,4 @@
-error[E0425]: cannot find type `BadId` in this scope
+error[E0412]: cannot find type `BadId` in this scope
  --> tests/fail/invalid_type_operation_arg_override.rs:7:38
   |
 7 |     type_override = Query.player.id: BadId,

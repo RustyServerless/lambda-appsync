@@ -1,4 +1,4 @@
-error[E0271]: expected `custom_log_init` to return `()`, but it returns `&str`
+error[E0271]: expected `custom_log_init` to be a fn item that returns `()`, but it returns `&str`
  --> tests/fail/invalid_log_init_ret.rs:7:67
   |
 7 |     appsync_lambda_main!("../../../../schema.graphql", log_init = custom_log_init);
