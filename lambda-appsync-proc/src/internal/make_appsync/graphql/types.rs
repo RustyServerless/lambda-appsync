@@ -4,7 +4,6 @@ use crate::internal::make_appsync::overrides::{NameOverrides, TypeOverrides};
 
 use super::*;
 
-#[derive(Debug)]
 pub(super) struct TypeTraitDerives {
     additional_trait_derivations: Vec<Path>,
     default_traits: bool,
@@ -238,7 +237,6 @@ impl ToTokens for Structure {
 }
 
 /// A GraphQL enum type, generating a Rust `enum` with serde, `Display`, and `FromStr` impls.
-#[derive(Debug)]
 pub(super) struct Enum {
     name: Name,
     variants: Vec<Name>,
