@@ -7,7 +7,6 @@
       url = "github:oxalica/rust-overlay";
       inputs = {
         nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
       };
     };
   };
@@ -29,7 +28,6 @@
         with pkgs; {
           devShells.default = mkShell {
             buildInputs = [rustToolchain];
-            RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
             shellHook = ''
               echo "Setting up development environment..."
               ./scripts/install-hooks.sh
