@@ -18,6 +18,9 @@ on:
       - "Cargo.lock"
       - ".github/workflows/**"
 
+env:
+  MSRV: "1.82.0"
+
 jobs:
   test:
     name: Test Suite
@@ -25,9 +28,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust 1.82.0
-        uses: dtolnay/rust-toolchain@1.82.0
+      - name: Install Rust ${{ env.MSRV }}
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.MSRV }}
           components: rustfmt, clippy
 
       - name: Cargo Format Check
