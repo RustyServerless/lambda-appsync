@@ -1,3 +1,6 @@
+#![warn(missing_docs)]
+#![warn(rustdoc::missing_crate_level_docs)]
+#![cfg_attr(docsrs, deny(rustdoc::broken_intra_doc_links))]
 //! Procedural macros for the [`lambda-appsync`](https://docs.rs/lambda-appsync) type-safe AWS
 //! AppSync resolver framework.
 //!

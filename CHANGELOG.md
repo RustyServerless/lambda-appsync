@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```
 - The default `appsync_handler` implementation now calls `event_hook` before delegating to `Operation::execute`. Custom `appsync_handler` overrides are unaffected but could probably be replaced by more focused `event_hook` overrides.
 - Removing the Operation::_execute function and inserted its content directly inside Operation::execute, avoiding a low-value async state machine nesting
+- Making clippy more aggressive
 
 [NEXT]: https://github.com/RustyServerless/lambda-appsync/compare/v0.10.0...vNEXT
 
