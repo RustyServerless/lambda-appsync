@@ -186,7 +186,9 @@ mod operation_type_test {
 
         let lambda_event =
             lambda_appsync::lambda_runtime::LambdaEvent::new(event, Default::default());
-        let response = DefaultHandlers::service_fn(lambda_event).await.unwrap();
+        let response = lambda_appsync::default_service_fn!()(lambda_event)
+            .await
+            .unwrap();
 
         // No handlers registered → Unimplemented error
         let response_value = lambda_appsync::serde_json::to_value(response).unwrap();
@@ -224,7 +226,9 @@ mod non_batch_with_operation_type {
         let lambda_event =
             lambda_appsync::lambda_runtime::LambdaEvent::new(event, Default::default());
         // Non-batch returns AppsyncResponse (not Vec<AppsyncResponse>)
-        let response: AppsyncResponse = DefaultHandlers::service_fn(lambda_event).await.unwrap();
+        let response: AppsyncResponse = lambda_appsync::default_service_fn!()(lambda_event)
+            .await
+            .unwrap();
 
         // No handlers registered → Unimplemented error
         let value = lambda_appsync::serde_json::to_value(&response).unwrap();
@@ -256,7 +260,9 @@ async fn composable_flow_handles_query() {
     }]);
 
     let lambda_event = lambda_appsync::lambda_runtime::LambdaEvent::new(event, Default::default());
-    let response = DefaultHandlers::service_fn(lambda_event).await.unwrap();
+    let response = lambda_appsync::default_service_fn!()(lambda_event)
+        .await
+        .unwrap();
 
     let response_value = lambda_appsync::serde_json::to_value(response).unwrap();
     // player returns None for a nonexistent ID → data is null
@@ -280,7 +286,9 @@ async fn composable_flow_unimplemented_returns_error() {
     }]);
 
     let lambda_event = lambda_appsync::lambda_runtime::LambdaEvent::new(event, Default::default());
-    let response = DefaultHandlers::service_fn(lambda_event).await.unwrap();
+    let response = lambda_appsync::default_service_fn!()(lambda_event)
+        .await
+        .unwrap();
 
     let response_value = lambda_appsync::serde_json::to_value(response).unwrap();
     assert_eq!(response_value[0]["errorType"], "Unimplemented");
@@ -303,7 +311,9 @@ async fn composable_flow_get_players_returns_empty_array() {
     }]);
 
     let lambda_event = lambda_appsync::lambda_runtime::LambdaEvent::new(event, Default::default());
-    let response = DefaultHandlers::service_fn(lambda_event).await.unwrap();
+    let response = lambda_appsync::default_service_fn!()(lambda_event)
+        .await
+        .unwrap();
 
     let response_value = lambda_appsync::serde_json::to_value(response).unwrap();
     assert!(response_value[0].get("data").is_some_and(|v| v.is_array()));

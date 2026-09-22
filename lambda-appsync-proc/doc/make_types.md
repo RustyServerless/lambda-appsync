@@ -118,6 +118,7 @@ schema becomes the default value.
 # What Gets Generated
 
 For each GraphQL `type` (excluding Query, Mutation, and Subscription), with default traits:
+
 ```rust,no_run
 # use serde::{Serialize, Deserialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -132,6 +133,7 @@ pub struct TypeName {
 ```
 
 For each GraphQL `input`, with default traits:
+
 ```rust,no_run
 # use serde::{Serialize, Deserialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -145,6 +147,7 @@ pub struct InputName {
 ```
 
 For each GraphQL `enum`, with default traits:
+
 ```rust,no_run
 # use serde::{Serialize, Deserialize};
 
@@ -157,6 +160,7 @@ pub enum EnumName {
 ```
 
 Each generated enum also gets:
+
 - `const COUNT: usize` — number of variants
 - `const fn all() -> [Self; Self::COUNT]` — array of all variants
 - `const fn index(self) -> usize` — index of the variant (useful for array indexing)
@@ -165,25 +169,25 @@ Each generated enum also gets:
 
 # GraphQL to Rust Type Mapping
 
-| GraphQL | Rust |
-|---------|------|
-| `String` | `String` |
-| `ID` | `lambda_appsync::ID` |
-| `Int` | `i32` |
-| `Float` | `f64` |
-| `Boolean` | `bool` |
-| `AWSEmail` | `lambda_appsync::AWSEmail` |
-| `AWSPhone` | `lambda_appsync::AWSPhone` |
+| GraphQL        | Rust                           |
+| -------------- | ------------------------------ |
+| `String`       | `String`                       |
+| `ID`           | `lambda_appsync::ID`           |
+| `Int`          | `i32`                          |
+| `Float`        | `f64`                          |
+| `Boolean`      | `bool`                         |
+| `AWSEmail`     | `lambda_appsync::AWSEmail`     |
+| `AWSPhone`     | `lambda_appsync::AWSPhone`     |
 | `AWSTimestamp` | `lambda_appsync::AWSTimestamp` |
-| `AWSDate` | `lambda_appsync::AWSDate` |
-| `AWSTime` | `lambda_appsync::AWSTime` |
-| `AWSDateTime` | `lambda_appsync::AWSDateTime` |
-| `AWSJSON` | `serde_json::Value` |
-| `AWSURL` | `lambda_appsync::AWSUrl` |
-| `AWSIPAddress` | `core::net::IpAddr` |
-| `[T]` (list) | `Vec<T>` |
-| nullable | `Option<T>` |
-| Custom type | The generated Rust struct/enum |
+| `AWSDate`      | `lambda_appsync::AWSDate`      |
+| `AWSTime`      | `lambda_appsync::AWSTime`      |
+| `AWSDateTime`  | `lambda_appsync::AWSDateTime`  |
+| `AWSJSON`      | `serde_json::Value`            |
+| `AWSURL`       | `lambda_appsync::AWSUrl`       |
+| `AWSIPAddress` | `core::net::IpAddr`            |
+| `[T]` (list)   | `Vec<T>`                       |
+| nullable       | `Option<T>`                    |
+| Custom type    | The generated Rust struct/enum |
 
 # Use Case: Shared Types Crate
 
@@ -208,6 +212,7 @@ overrides in [make_operation!] so that operation signatures reference the correc
 # Examples
 
 ## Basic usage:
+
 ```rust,no_run
 # mod sub {
 lambda_appsync::make_types!("schema.graphql");
@@ -216,6 +221,7 @@ lambda_appsync::make_types!("schema.graphql");
 ```
 
 ## With type overrides:
+
 ```rust,no_run
 # mod sub {
 lambda_appsync::make_types!(
@@ -228,6 +234,7 @@ lambda_appsync::make_types!(
 ```
 
 ## With name overrides:
+
 ```rust,no_run
 # mod sub {
 lambda_appsync::make_types!(
@@ -244,6 +251,7 @@ lambda_appsync::make_types!(
 ```
 
 ## Combined overrides:
+
 ```rust,no_run
 # mod sub {
 lambda_appsync::make_types!(
@@ -256,6 +264,7 @@ lambda_appsync::make_types!(
 ```
 
 ## Disable default derivations for a type:
+
 ```rust,no_run
 # mod sub {
 lambda_appsync::make_types!(
@@ -268,6 +277,7 @@ lambda_appsync::make_types!(
 ```
 
 ## Add extra derive macros to a type:
+
 ```rust,no_run
 # mod sub {
 lambda_appsync::make_types!(
@@ -282,6 +292,7 @@ lambda_appsync::make_types!(
 ```
 
 ## Combine default_traits and derive:
+
 ```rust,no_run
 # mod sub {
 lambda_appsync::make_types!(

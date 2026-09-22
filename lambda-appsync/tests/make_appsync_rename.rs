@@ -197,7 +197,7 @@ fn invalid_deserialization_with_renames() {
     assert!(result.is_err());
 }
 
-// Verify that the generated DefaultHandlers works with the renamed types.
+// Verify that default_service_fn! works with the renamed types.
 // No operation handlers are registered, so all operations return "Unimplemented".
 #[tokio::test]
 async fn handlers_work_with_renamed_types() {
@@ -216,7 +216,9 @@ async fn handlers_work_with_renamed_types() {
     }]);
 
     let lambda_event = lambda_appsync::lambda_runtime::LambdaEvent::new(event, Default::default());
-    let response = DefaultHandlers::service_fn(lambda_event).await.unwrap();
+    let response = lambda_appsync::default_service_fn!()(lambda_event)
+        .await
+        .unwrap();
 
     // No handlers registered → Unimplemented
     let response_value = serde_json::to_value(response).unwrap();

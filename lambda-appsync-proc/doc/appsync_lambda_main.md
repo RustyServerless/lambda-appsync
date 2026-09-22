@@ -77,6 +77,7 @@ appsync_lambda_main!(
 # }
 # fn main() {}
 ```
+
 ```rust,no_run
 # mod sub {
 # use lambda_appsync::appsync_lambda_main;
@@ -91,6 +92,7 @@ appsync_lambda_main!(
 ```
 
 These client functions can then be called from anywhere in the Lambda crate:
+
 ```rust,no_run
 # fn dynamodb() -> aws_sdk_dynamodb::Client {
 #   todo!()
@@ -112,6 +114,7 @@ async fn do_something() {
 # Examples
 
 ## Basic usage with authentication hook:
+
 ```rust,no_run
 # mod sub {
 use lambda_appsync::{appsync_lambda_main, AppsyncEvent, AppsyncResponse, AppsyncIdentity};
@@ -143,6 +146,7 @@ appsync_lambda_main!(
 ```
 
 ## Generate only types for lib code generation:
+
 ```rust,no_run
 # mod sub {
 use lambda_appsync::appsync_lambda_main;
@@ -155,6 +159,7 @@ appsync_lambda_main!(
 ```
 
 ## Override field types, operation return type or argument types:
+
 ```rust,no_run
 # mod sub {
 use lambda_appsync::appsync_lambda_main;
@@ -178,6 +183,7 @@ appsync_lambda_main!(
 ```
 
 ## Override type, input, enum, fields or variants names:
+
 ```rust,no_run
 # mod sub {
 use lambda_appsync::appsync_lambda_main;
@@ -198,6 +204,7 @@ appsync_lambda_main!(
 # }
 # fn main() {}
 ```
+
 Note that when using `name_override`, the macro does not automatically change the case:
 you are responsible to provide the appropriate casing or Clippy will complain.
 
@@ -264,6 +271,7 @@ lambda_appsync::appsync_lambda_main!(
 ```
 
 ## Disable batch processing:
+
 ```rust,no_run
 # mod sub {
 lambda_appsync::appsync_lambda_main!(

@@ -1,4 +1,5 @@
 <!-- PROJECT SHIELDS -->
+
 [![crates.io](https://img.shields.io/crates/v/lambda-appsync.svg)](https://crates.io/crates/lambda-appsync)
 [![docs.rs](https://docs.rs/lambda-appsync/badge.svg)](https://docs.rs/lambda-appsync/latest/lambda_appsync)
 [![CI](https://github.com/RustyServerless/lambda-appsync/workflows/CI/badge.svg)](https://github.com/RustyServerless/lambda-appsync/actions)
@@ -35,7 +36,7 @@ The `lambda-appsync` crate provides procedural macros that read a GraphQL schema
 
 - **Rust types** for all GraphQL objects, inputs, and enums
 - An **`Operation` enum** covering every query, mutation, and subscription field, with argument extraction and dispatch logic
-- A **`Handlers` trait** and `DefaultHandlers` struct for wiring up the AWS Lambda runtime
+- A **`Handlers` trait** with methods for wiring up the AWS Lambda runtime
 
 You write resolver functions annotated with `#[appsync_operation(...)]` and the framework validates their signatures against the schema, handles deserialization, and produces properly formatted AppSync responses.
 
@@ -66,7 +67,7 @@ Add this dependency to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-lambda-appsync = "0.10.0"
+lambda-appsync = "0.11.0"
 ```
 
 Or using cargo:
@@ -108,7 +109,7 @@ enum GameStatus {
 2. Generate types, operations, and handlers from the schema:
 
 ```rust
-use lambda_appsync::{make_appsync, appsync_operation, AppsyncError};
+use lambda_appsync::{default_service_fn, make_appsync, appsync_operation, AppsyncError};
 
 // Generate everything from the schema
 make_appsync!("schema.graphql");
@@ -130,7 +131,7 @@ async fn get_game_status() -> Result<GameStatus, AppsyncError> {
 #[tokio::main]
 async fn main() -> Result<(), lambda_runtime::Error> {
     lambda_runtime::run(
-        lambda_runtime::service_fn(DefaultHandlers::service_fn)
+        lambda_runtime::service_fn(default_service_fn!())
     ).await
 }
 ```
@@ -154,7 +155,7 @@ Clone the repo to get started with a production-ready template for building serv
 
 ### Custom Handler with Authentication Hook
 
-Override the `Handlers` trait to add pre-processing logic such as authentication checks:
+Override `event_hook` on the `Handlers` trait to add pre-flight checks such as authentication:
 
 ```rust
 use lambda_appsync::{make_appsync, appsync_operation, AppsyncError};
@@ -164,13 +165,11 @@ make_appsync!("schema.graphql");
 
 struct MyHandlers;
 impl Handlers for MyHandlers {
-    async fn appsync_handler(event: AppsyncEvent<Operation>) -> AppsyncResponse {
-        // Custom authentication check
+    fn event_hook(event: &AppsyncEvent<Operation>) -> Option<AppsyncResponse> {
         if let AppsyncIdentity::ApiKey = &event.identity {
-            return AppsyncResponse::unauthorized();
+            return Some(AppsyncResponse::unauthorized());
         }
-        // Delegate to the default operation dispatch
-        event.info.operation.execute(event).await
+        None
     }
 }
 
@@ -194,7 +193,7 @@ This replaces the old `hook` parameter from `appsync_lambda_main!`. See the [`ma
 For larger projects where you share GraphQL types across multiple Lambda functions, use the individual macros:
 
 ```rust
-use lambda_appsync::{make_types, make_operation, make_handlers, appsync_operation, AppsyncError};
+use lambda_appsync::{default_service_fn, make_types, make_operation, make_handlers, appsync_operation, AppsyncError};
 
 // Step 1: Generate types (could live in a shared lib crate)
 make_types!("schema.graphql");
@@ -202,7 +201,7 @@ make_types!("schema.graphql");
 // Step 2: Generate Operation enum and dispatch logic
 make_operation!("schema.graphql");
 
-// Step 3: Generate Handlers trait and DefaultHandlers
+// Step 3: Generate Handlers trait
 make_handlers!();
 
 #[appsync_operation(query(players))]
@@ -213,7 +212,7 @@ async fn get_players() -> Result<Vec<Player>, AppsyncError> {
 #[tokio::main]
 async fn main() -> Result<(), lambda_runtime::Error> {
     lambda_runtime::run(
-        lambda_runtime::service_fn(DefaultHandlers::service_fn)
+        lambda_runtime::service_fn(default_service_fn!())
     ).await
 }
 ```
@@ -296,6 +295,7 @@ async fn on_create_player(name: String) -> Result<Option<FilterGroup>, AppsyncEr
 ```
 
 > **Important:** When using enhanced subscription filters, your AppSync **Response** mapping template must contain:
+>
 > ```vtl
 > #if($context.result.data)
 > $extensions.setSubscriptionFilter($context.result.data)
@@ -386,50 +386,50 @@ let err = AppsyncError::new("ValidationError", "Invalid email")
 
 ## Macro Reference
 
-| Macro | Kind | Purpose |
-|---|---|---|
-| [`make_appsync!`](https://docs.rs/lambda-appsync/latest/lambda_appsync/macro.make_appsync.html) | All-in-one | Generate types, `Operation` enum, and `Handlers` trait from a schema |
-| [`make_types!`](https://docs.rs/lambda-appsync/latest/lambda_appsync/macro.make_types.html) | Composable | Generate Rust structs and enums from schema type definitions |
-| [`make_operation!`](https://docs.rs/lambda-appsync/latest/lambda_appsync/macro.make_operation.html) | Composable | Generate the `Operation` enum and dispatch logic |
-| [`make_handlers!`](https://docs.rs/lambda-appsync/latest/lambda_appsync/macro.make_handlers.html) | Composable | Generate the `Handlers` trait and `DefaultHandlers` struct |
-| [`#[appsync_operation]`](https://docs.rs/lambda-appsync/latest/lambda_appsync/attr.appsync_operation.html) | Attribute | Bind an async function to a specific GraphQL operation |
-| `appsync_lambda_main!` | Legacy (`compat`) | Deprecated monolithic macro — prefer `make_appsync!` for new code |
+| Macro                                                                                                      | Kind              | Purpose                                                              |
+| ---------------------------------------------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------- |
+| [`make_appsync!`](https://docs.rs/lambda-appsync/latest/lambda_appsync/macro.make_appsync.html)            | All-in-one        | Generate types, `Operation` enum, and `Handlers` trait from a schema |
+| [`make_types!`](https://docs.rs/lambda-appsync/latest/lambda_appsync/macro.make_types.html)                | Composable        | Generate Rust structs and enums from schema type definitions         |
+| [`make_operation!`](https://docs.rs/lambda-appsync/latest/lambda_appsync/macro.make_operation.html)        | Composable        | Generate the `Operation` enum and dispatch logic                     |
+| [`make_handlers!`](https://docs.rs/lambda-appsync/latest/lambda_appsync/macro.make_handlers.html)          | Composable        | Generate the `Handlers` trait                                        |
+| [`#[appsync_operation]`](https://docs.rs/lambda-appsync/latest/lambda_appsync/attr.appsync_operation.html) | Attribute         | Bind an async function to a specific GraphQL operation               |
+| `appsync_lambda_main!`                                                                                     | Legacy (`compat`) | Deprecated monolithic macro — prefer `make_appsync!` for new code    |
 
 For detailed syntax, options, and examples for each macro, see the [API documentation on docs.rs](https://docs.rs/lambda-appsync/latest/lambda_appsync).
 
 ### When to Use Which Macro
 
-| Scenario | Recommendation |
-|----------|---------------|
-| Single Lambda function, all code in one crate | `make_appsync!` |
+| Scenario                                        | Recommendation                                                                |
+| ----------------------------------------------- | ----------------------------------------------------------------------------- |
+| Single Lambda function, all code in one crate   | `make_appsync!`                                                               |
 | Shared types library + multiple Lambda binaries | `make_types!` in the lib, `make_operation!` + `make_handlers!` in each binary |
-| Custom handler logic only | `make_appsync!` + override `Handlers` trait methods |
-| Need different operations per Lambda | `make_types!` shared, separate `make_operation!` per Lambda |
+| Custom handler logic only                       | `make_appsync!` + override `Handlers` trait methods                           |
+| Need different operations per Lambda            | `make_types!` shared, separate `make_operation!` per Lambda                   |
 
 ## Feature Flags
 
-| Feature | Default | Description |
-|---------|---------|-------------|
-| `compat` | ❌ | Enables the deprecated `appsync_lambda_main!` macro and re-exports `aws_config`. Not required for `make_appsync!` or the composable macros. |
-| `log` | ❌ | Re-exports the [`log`](https://docs.rs/log) crate so resolver code can use `log::info!` etc. without a separate dependency. Enables `log::error!` in generated dispatch code. |
-| `env_logger` | ❌ | Re-exports `env_logger` for local development. Implies `log` and `compat`. |
-| `tracing` | ❌ | Re-exports `tracing` and `tracing-subscriber`. When enabled, the generated `Handlers` trait wraps each event dispatch in a `tracing::info_span!` for per-operation observability. |
+| Feature      | Default | Description                                                                                                                                                                       |
+| ------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `compat`     | ❌      | Enables the deprecated `appsync_lambda_main!` macro and re-exports `aws_config`. Not required for `make_appsync!` or the composable macros.                                       |
+| `log`        | ❌      | Re-exports the [`log`](https://docs.rs/log) crate so resolver code can use `log::info!` etc. without a separate dependency. Enables `log::error!` in generated dispatch code.     |
+| `env_logger` | ❌      | Re-exports `env_logger` for local development. Implies `log` and `compat`.                                                                                                        |
+| `tracing`    | ❌      | Re-exports `tracing` and `tracing-subscriber`. When enabled, the generated `Handlers` trait wraps each event dispatch in a `tracing::info_span!` for per-operation observability. |
 
 ```toml
 # No features needed for basic usage
-lambda-appsync = "0.10.0"
+lambda-appsync = "0.11.0"
 
 # Enable tracing instrumentation
-lambda-appsync = { version = "0.10.0", features = ["tracing"] }
+lambda-appsync = { version = "0.11.0", features = ["tracing"] }
 
 # Enable log + env_logger (similar to pre-0.10 defaults)
-lambda-appsync = { version = "0.10.0", features = ["env_logger"] }
+lambda-appsync = { version = "0.11.0", features = ["env_logger"] }
 
 # Use both tracing and env_logger (migration scenarios)
-lambda-appsync = { version = "0.10.0", features = ["env_logger", "tracing"] }
+lambda-appsync = { version = "0.11.0", features = ["env_logger", "tracing"] }
 
 # Just the log crate re-export, bring your own logger
-lambda-appsync = { version = "0.10.0", features = ["log"] }
+lambda-appsync = { version = "0.11.0", features = ["log"] }
 ```
 
 ## Migrating from `appsync_lambda_main!`
@@ -456,6 +456,7 @@ fn custom_log_init() {
 async fn auth_hook(
     event: &AppsyncEvent<Operation>,
 ) -> Option<AppsyncResponse> {
+    // In AWS AppSync, ApiKey means no user auth
     if let AppsyncIdentity::ApiKey = &event.identity {
         return Some(AppsyncResponse::unauthorized());
     }
@@ -478,24 +479,27 @@ async fn get_players() -> Result<Vec<Player>, AppsyncError> {
 }
 ```
 
-### After (v0.10)
+### After (v0.11)
 
 ```rust
-use lambda_appsync::{make_appsync, appsync_operation, AppsyncError};
+use std::sync::OnceLock;
+
+use lambda_appsync::{default_service_fn, make_appsync, appsync_operation, AppsyncError};
 use lambda_appsync::{AppsyncEvent, AppsyncResponse, AppsyncIdentity};
 
 // 1. Generate types, Operation enum, and Handlers trait
 make_appsync!("schema.graphql");
 
-// 2. Hook → custom Handlers impl
+// 2. Hook → override event_hook
 struct MyHandlers;
 impl Handlers for MyHandlers {
-    async fn appsync_handler(event: AppsyncEvent<Operation>) -> AppsyncResponse {
+    fn event_hook(event: &AppsyncEvent<Operation>) -> Option<AppsyncResponse> {
         // Auth check (was the `hook` parameter)
+        // Prevent unauthenticated (i.e. AppSync API Key) users
         if let AppsyncIdentity::ApiKey = &event.identity {
-            return AppsyncResponse::unauthorized();
+            return Some(AppsyncResponse::unauthorized());
         }
-        event.info.operation.execute(event).await
+        None
     }
 }
 
@@ -506,7 +510,25 @@ async fn get_players() -> Result<Vec<Player>, AppsyncError> {
     todo!()
 }
 
-// 4. main() — you own the runtime, logging, and SDK clients
+// 4. SDK clients are your responsibility, here is an example way to handle them
+static AWS_SDK_CONFIG: OnceLock<aws_config::SdkConfig> = OnceLock::new();
+pub fn aws_sdk_config() -> &'static aws_config::SdkConfig {
+    AWS_SDK_CONFIG.get().unwrap()
+}
+pub fn dynamodb() -> aws_sdk_dynamodb::Client {
+    static CLIENT: OnceLock<aws_sdk_dynamodb::Client> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| <aws_sdk_dynamodb::Client>::new(aws_sdk_config()))
+        .clone()
+}
+pub fn s3() -> aws_sdk_s3::Client {
+    static CLIENT: OnceLock<aws_sdk_s3::Client> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| <aws_sdk_s3::Client>::new(aws_sdk_config()))
+        .clone()
+}
+
+// 5. main() — you own the runtime and logging
 #[tokio::main]
 async fn main() -> Result<(), lambda_runtime::Error> {
     // log_init → call directly in main
@@ -518,37 +540,35 @@ async fn main() -> Result<(), lambda_runtime::Error> {
     .format_timestamp_micros()
     .init();
 
-    // AWS SDK clients → initialize directly
-    let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
-    let _dynamodb = aws_sdk_dynamodb::Client::new(&config);
-    let _s3 = aws_sdk_s3::Client::new(&config);
-
-    // event_logging → add logging in your Handlers impl or here
+    // This global must be initialized early
+    AWS_SDK_CONFIG
+        .set(aws_config::load_from_env().await)
+        .unwrap();
 
     lambda_runtime::run(
-        lambda_runtime::service_fn(MyHandlers::service_fn)
+        lambda_runtime::service_fn(default_service_fn!())
     ).await
 }
 ```
 
 ### Migration cheat sheet
 
-| `appsync_lambda_main!` option | New approach |
-|-------------------------------|-------------|
-| `hook = fn_name` | Override `Handlers::appsync_handler` |
-| `log_init = fn_name` | Call your init function in `main()` |
-| `event_logging = true` | Add logging in your `Handlers` impl or `main()` |
-| `dynamodb() -> Client` | Initialize AWS SDK clients in `main()` |
-| `only_appsync_types = true` | Use `make_types!` alone |
-| `exclude_appsync_types = true` | Use `make_operation!` + `make_handlers!` |
-| `batch = false` | `make_appsync!("schema.graphql", batch = false)` or `make_handlers!(batch = false)` |
+| `appsync_lambda_main!` option  | New approach                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------------- |
+| `hook = fn_name`               | Override `Handlers::event_hook`                                                     |
+| `log_init = fn_name`           | Call your init function in `main()`                                                 |
+| `event_logging = true`         | Add logging in your `Handlers` impl or `main()`                                     |
+| `dynamodb() -> Client`         | Manage AWS SDK clients yourself                                                     |
+| `only_appsync_types = true`    | Use `make_types!` alone                                                             |
+| `exclude_appsync_types = true` | Use `make_operation!` + `make_handlers!`                                            |
+| `batch = false`                | `make_appsync!("schema.graphql", batch = false)` or `make_handlers!(batch = false)` |
 
 ### Cargo.toml changes
 
 ```diff
  [dependencies]
 - lambda-appsync = { version = "0.9.0", features = ["tracing"] }
-+ lambda-appsync = { version = "0.10.0", features = ["tracing"] }
++ lambda-appsync = { version = "0.11.0", features = ["tracing"] }
 + tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 + lambda_runtime = "1.0"
 + # Add AWS SDK crates you use directly:
@@ -577,7 +597,7 @@ The new design draws a clear boundary: `lambda-appsync` generates the types, the
 A concrete example: the [`awssdk-instrumentation`](https://crates.io/crates/awssdk-instrumentation) crate provides out-of-the-box OpenTelemetry/X-Ray tracing for AWS SDK calls via a Tower layer wrapping the Lambda runtime. If `lambda-appsync` owns `main()`, there is no way to insert that layer. With the new design, composing the two is straightforward:
 
 ```rust
-use lambda_appsync::{make_appsync, appsync_operation, AppsyncError};
+use lambda_appsync::{default_service_fn, make_appsync, appsync_operation, AppsyncError};
 use awssdk_instrumentation::interceptor::DefaultInterceptor;
 use awssdk_instrumentation::lambda::layer::{DefaultTracingLayer, OTelFaasTrigger};
 
@@ -602,7 +622,7 @@ async fn main() -> Result<(), lambda_runtime::Error> {
     );
 
     // Wrap the Lambda runtime with the OTel Tower layer
-    lambda_runtime::Runtime::new(lambda_runtime::service_fn(DefaultHandlers::service_fn))
+    lambda_runtime::Runtime::new(lambda_runtime::service_fn(default_service_fn!()))
         .layer(
             DefaultTracingLayer::new(move || {
                 let _ = tracer_provider.force_flush();
@@ -631,12 +651,14 @@ We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING
 This project uses git hooks to ensure code quality. The hooks are automatically installed when you enter a development shell using `nix flakes` and `direnv`.
 
 The following checks run before each commit:
+
 - Code formatting (`cargo fmt`)
 - Linting (`cargo clippy`)
 - Doc generation (`cargo doc`)
 - Tests (`cargo test`)
 
 To manually install the hooks:
+
 ```sh
 ./scripts/install-hooks.sh
 ```

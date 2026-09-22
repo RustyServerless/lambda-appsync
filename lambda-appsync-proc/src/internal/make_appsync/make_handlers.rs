@@ -50,7 +50,7 @@ impl OptionalParameters<MakeHandlersParameter> for MakeHandlersParameters {
     }
 }
 
-/// Generates the `Handlers` trait and `DefaultHandlers` implementation for dispatching AppSync events.
+/// Generates the `Handlers` trait for dispatching AppSync events.
 pub(super) struct MakeHandlers {
     batch: bool,
     operation_type: TokenStream2,
@@ -148,17 +148,27 @@ impl ToTokens for MakeHandlers {
             )
         };
 
+        let event_hook_call = quote! {
+            if let Some(response) = Self::event_hook(&event) {
+                return response;
+            }
+        };
+
         let appsync_handler = if self.batch {
             quote! {
                 fn appsync_handler(
                     event: ::lambda_appsync::AppsyncEvent<#operation>
-                ) -> impl std::future::Future<Output = ::lambda_appsync::AppsyncResponse> + Send + 'static {
-                    event.info.operation.execute(event)
+                ) -> impl ::std::future::Future<Output = ::lambda_appsync::AppsyncResponse> + Send + 'static {
+                    async {
+                        #event_hook_call
+                        event.info.operation.execute(event).await
+                    }
                 }
             }
         } else if cfg!(feature = "tracing") {
             quote! {
                 async fn appsync_handler(event: ::lambda_appsync::AppsyncEvent<#operation>) -> ::lambda_appsync::AppsyncResponse {
+                    #event_hook_call
                     let operation = event.info.operation;
                     ::lambda_appsync::tracing::Instrument::instrument(event.info.operation.execute(event),
                         ::lambda_appsync::tracing::info_span!(
@@ -171,6 +181,7 @@ impl ToTokens for MakeHandlers {
         } else {
             quote! {
                 async fn appsync_handler(event: ::lambda_appsync::AppsyncEvent<#operation>) -> ::lambda_appsync::AppsyncResponse {
+                    #event_hook_call
                     event.info.operation.execute(event).await
                 }
             }
@@ -180,6 +191,17 @@ impl ToTokens for MakeHandlers {
 
             #[deny(dead_code)]
             trait Handlers {
+                #[doc = "Receive the event [lambda_appsync::AppsyncEvent<Operation>] and can decide to return an immediate response."]
+                #[doc = ""]
+                #[doc = "Typically used to implement some sort of authentication."]
+                #[doc = ""]
+                #[doc = "# Important"]
+                #[doc = "Do not block in this function, as it is called by the async [`Handlers::appsync_handler`] and it could starve the executor."]
+                #[doc = "If you need to perform blocking or async operations, you should override [`Handlers::appsync_handler`] directly"]
+                fn event_hook(_event: &::lambda_appsync::AppsyncEvent<#operation>) -> Option<::lambda_appsync::AppsyncResponse> {
+                    None
+                }
+
                 #[doc = "Handles a single deserialized [lambda_appsync::AppsyncEvent<Operation>]."]
                 #appsync_handler
 
@@ -192,10 +214,6 @@ impl ToTokens for MakeHandlers {
                     Ok(Self::#service_fn_call(::lambda_appsync::serde_json::from_value(event.payload)?).await)
                 }
             }
-
-            struct DefaultHandlers;
-            impl Handlers for DefaultHandlers {}
-
         });
     }
 }

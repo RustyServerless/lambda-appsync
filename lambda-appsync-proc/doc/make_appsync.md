@@ -2,13 +2,15 @@ Convenience macro that combines [make_types!], [make_operation!], and [make_hand
 
 # Usage
 
+Use it at the root of your crate.
+
 ```text
 make_appsync!("path/to/schema.graphql");
 
 // or with options:
 make_appsync!(
     "path/to/schema.graphql",
-    batch = true,                                        // enable/disable batch handling
+    batch = true,                                         // enable/disable batch handling
     type_override = Type.field: CustomType,               // override a field type
     type_override = Query.operation: CustomType,          // override an operation return type
     type_override = Query.operation.arg: CustomType,      // override an operation argument type
@@ -17,7 +19,7 @@ make_appsync!(
     default_traits = MyType: false,                       // disable default traits for a type
     derive = MyType: Default,                             // add an extra derive macro to a type
     derive = MyType: PartialEq,                           // (specify multiple times for multiple derives)
-    error_logging = false,                               // disable error logging (feature: log)
+    error_logging = false,                                // disable error logging (feature: log)
 );
 ```
 
@@ -27,11 +29,17 @@ GraphQL schema:
 - Rust types for all GraphQL types (enums, inputs, objects) — same as [make_types!]
 - The `Operation` enum with `QueryField`/`MutationField`/`SubscriptionField` sub-enums and
   dispatch logic — same as [make_operation!]
-- The `Handlers` trait and `DefaultHandlers` struct — same as [make_handlers!]
+- The `Handlers` trait — same as [make_handlers!]
 
 This is the recommended macro for the common single-Lambda-function use case. For multi-crate
 setups or when you need finer control over what gets generated where, use the individual macros
 instead.
+
+# Important Prerequisites
+
+The [macro@appsync_operation] attribute macro depends on being able to add impl crate::Operation {...}
+blocks. You **MUST** use `make_appsync!` (or [make_operation!]) at the crate root in order to use
+`#[appsync_operation(...)]`.
 
 # Schema Path Argument
 
@@ -68,11 +76,6 @@ The schema path can be:
 - `batch = bool` (default: `true`): Enable/disable batch request handling. See [make_handlers!]
   for details.
 
-## Parameters NOT available
-
-- `type_module` (from [make_operation!]) — Not needed since types are generated in the same scope
-- `operation_type` (from [make_handlers!]) — Not needed since `Operation` is generated in the same scope
-
 ## Type Overrides
 
 The `type_override` option allows overriding Rust types affected to various schema elements:
@@ -101,21 +104,23 @@ you are responsible to provide the appropriate casing or Clippy will complain.
 # Examples
 
 ## Basic usage:
+
 ```rust,no_run
 # use lambda_appsync::{tokio, lambda_runtime};
-use lambda_appsync::make_appsync;
+use lambda_appsync::{default_service_fn, make_appsync};
 
 make_appsync!("schema.graphql");
 
 #[tokio::main]
 async fn main() -> Result<(), lambda_runtime::Error> {
     lambda_runtime::run(
-        lambda_runtime::service_fn(DefaultHandlers::service_fn)
+        lambda_runtime::service_fn(default_service_fn!())
     ).await
 }
 ```
 
 ## With type and name overrides:
+
 ```rust,no_run
 # mod sub {
 lambda_appsync::make_appsync!(
@@ -136,6 +141,7 @@ lambda_appsync::make_appsync!(
 ```
 
 ## Disable batch processing:
+
 ```rust,no_run
 # mod sub {
 lambda_appsync::make_appsync!(
@@ -146,7 +152,8 @@ lambda_appsync::make_appsync!(
 # fn main() {}
 ```
 
-## With a custom handler:
+## With an authentication check:
+
 ```rust,no_run
 # use lambda_appsync::{tokio, lambda_runtime};
 use lambda_appsync::{make_appsync, appsync_operation, AppsyncError, AppsyncResponse, AppsyncEvent, AppsyncIdentity};
@@ -155,11 +162,11 @@ make_appsync!("schema.graphql");
 
 struct MyHandlers;
 impl Handlers for MyHandlers {
-    async fn appsync_handler(event: AppsyncEvent<Operation>) -> AppsyncResponse {
+    fn event_hook(event: &AppsyncEvent<Operation>) -> Option<AppsyncResponse> {
         if let AppsyncIdentity::ApiKey = &event.identity {
-            return AppsyncResponse::unauthorized();
+          return Some(AppsyncResponse::unauthorized())
         }
-        event.info.operation.execute(event).await
+        None
     }
 }
 
@@ -179,6 +186,7 @@ async fn main() -> Result<(), lambda_runtime::Error> {
 # Equivalence
 
 The following `make_appsync!` invocation:
+
 ```rust,no_run
 # use lambda_appsync::serde;
 # mod sub {
@@ -195,6 +203,7 @@ lambda_appsync::make_appsync!(
 ```
 
 is equivalent to:
+
 ```rust,no_run
 # use lambda_appsync::serde;
 # mod sub {
@@ -218,9 +227,9 @@ lambda_appsync::make_handlers!(
 
 # When to Use make_appsync! vs Individual Macros
 
-| Scenario | Recommendation |
-|----------|---------------|
-| Single Lambda function, all code in one crate | Use `make_appsync!` |
+| Scenario                                        | Recommendation                                                                    |
+| ----------------------------------------------- | --------------------------------------------------------------------------------- |
+| Single Lambda function, all code in one crate   | Use `make_appsync!`                                                               |
 | Shared types library + multiple Lambda binaries | Use [make_types!] in the lib, [make_operation!] + [make_handlers!] in each binary |
-| Custom handler logic only | Use `make_appsync!` + override `Handlers` trait methods |
-| Need different operations per Lambda | Use [make_types!] shared, separate [make_operation!] per Lambda |
+| Custom handler logic only                       | Use `make_appsync!` + override `Handlers` trait methods                           |
+| Need different operations per Lambda            | Use [make_types!] shared, separate [make_operation!] per Lambda                   |

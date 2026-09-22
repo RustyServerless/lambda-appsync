@@ -100,7 +100,7 @@ async fn create_and_get_player() {
 
     let create_lambda_event =
         lambda_appsync::lambda_runtime::LambdaEvent::new(create_event, Default::default());
-    let create_response = DefaultHandlers::service_fn(create_lambda_event)
+    let create_response = lambda_appsync::default_service_fn!()(create_lambda_event)
         .await
         .unwrap();
 
@@ -126,7 +126,9 @@ async fn create_and_get_player() {
 
     let get_lambda_event =
         lambda_appsync::lambda_runtime::LambdaEvent::new(get_event, Default::default());
-    let get_response = DefaultHandlers::service_fn(get_lambda_event).await.unwrap();
+    let get_response = lambda_appsync::default_service_fn!()(get_lambda_event)
+        .await
+        .unwrap();
 
     let response_value = serde_json::to_value(get_response).unwrap();
     assert_eq!(response_value[0]["data"]["name"], "Test Player");
@@ -151,7 +153,9 @@ async fn get_nonexistent_player() {
     }]);
 
     let lambda_event = lambda_appsync::lambda_runtime::LambdaEvent::new(event, Default::default());
-    let response = DefaultHandlers::service_fn(lambda_event).await.unwrap();
+    let response = lambda_appsync::default_service_fn!()(lambda_event)
+        .await
+        .unwrap();
 
     let response_value = serde_json::to_value(response).unwrap();
     assert!(response_value[0]["data"].is_null());
@@ -175,7 +179,7 @@ async fn unimplemented_operation() {
 
     let set_status_lambda_event =
         lambda_appsync::lambda_runtime::LambdaEvent::new(set_status_event, Default::default());
-    let set_status_response = DefaultHandlers::service_fn(set_status_lambda_event)
+    let set_status_response = lambda_appsync::default_service_fn!()(set_status_lambda_event)
         .await
         .unwrap();
 
@@ -206,7 +210,9 @@ async fn delete_nonexistent_player() {
     }]);
 
     let lambda_event = lambda_appsync::lambda_runtime::LambdaEvent::new(event, Default::default());
-    let response = DefaultHandlers::service_fn(lambda_event).await.unwrap();
+    let response = lambda_appsync::default_service_fn!()(lambda_event)
+        .await
+        .unwrap();
 
     let response_value = serde_json::to_value(response).unwrap();
     assert_eq!(response_value[0]["errorType"], "NotFound");
@@ -239,7 +245,7 @@ async fn batch_create_multiple_players() {
 
     let create_lambda_event =
         lambda_appsync::lambda_runtime::LambdaEvent::new(create_event, Default::default());
-    let response = DefaultHandlers::service_fn(create_lambda_event)
+    let response = lambda_appsync::default_service_fn!()(create_lambda_event)
         .await
         .unwrap();
 
@@ -268,7 +274,9 @@ async fn get_all_players_returns_array() {
     }]);
 
     let lambda_event = lambda_appsync::lambda_runtime::LambdaEvent::new(event, Default::default());
-    let response = DefaultHandlers::service_fn(lambda_event).await.unwrap();
+    let response = lambda_appsync::default_service_fn!()(lambda_event)
+        .await
+        .unwrap();
 
     let response_value = serde_json::to_value(response).unwrap();
     assert!(response_value[0].get("data").is_some_and(|v| v.is_array()));
@@ -307,7 +315,9 @@ async fn service_fn_returns_vec_of_responses() {
     ]);
 
     let lambda_event = lambda_appsync::lambda_runtime::LambdaEvent::new(event, Default::default());
-    let responses: Vec<AppsyncResponse> = DefaultHandlers::service_fn(lambda_event).await.unwrap();
+    let responses: Vec<AppsyncResponse> = lambda_appsync::default_service_fn!()(lambda_event)
+        .await
+        .unwrap();
 
     assert_eq!(responses.len(), 2);
     let values = serde_json::to_value(&responses).unwrap();

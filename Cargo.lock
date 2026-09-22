@@ -1223,7 +1223,7 @@ checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
 
 [[package]]
 name = "lambda-appsync"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "aws-config",
  "aws-sdk-dynamodb",
@@ -1243,7 +1243,7 @@ dependencies = [
 
 [[package]]
 name = "lambda-appsync-proc"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "aws-sdk-dynamodb",
  "aws-sdk-s3",

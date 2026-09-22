@@ -375,19 +375,7 @@ impl GraphQLSchema {
                 pub async fn execute(self,
                     event: ::lambda_appsync::AppsyncEvent<Self>
                 ) -> ::lambda_appsync::AppsyncResponse {
-                    match self._execute(event).await {
-                        ::core::result::Result::Ok(v) => v.into(),
-                        ::core::result::Result::Err(e) => {
-                            #log_lines
-                            e.into()
-                        }
-                    }
-                }
-                async fn _execute(
-                    self,
-                    event: ::lambda_appsync::AppsyncEvent<Self>
-                ) -> ::core::result::Result<::lambda_appsync::serde_json::Value, ::lambda_appsync::AppsyncError> {
-                    match self {
+                    let execution_result = match self {
                         Operation::Query(query_field) => match query_field {
                             #(#query_field_execute_match_arm,)*
                         },
@@ -397,6 +385,13 @@ impl GraphQLSchema {
                         Operation::Subscription(subscription_field) => match subscription_field {
                             #(#subscription_field_execute_match_arm,)*
                         },
+                    };
+                    match execution_result {
+                        ::core::result::Result::Ok(v) => v.into(),
+                        ::core::result::Result::Err(e) => {
+                            #log_lines
+                            e.into()
+                        }
                     }
                 }
             }
